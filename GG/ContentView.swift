@@ -10,23 +10,26 @@ import SwiftUI
 struct ContentView: View {
     @ObservedObject var keyboardMonitor: KeyboardMonitor
     @ObservedObject var textFieldReader: TextFieldReader
+    @ObservedObject var aiSuggestionEngine: AISuggestionEngine
+    @ObservedObject var aiService: OpenAIService
     @State private var lastSuggestionText: String = "No suggestions yet"
     @State private var lastTextFieldChange: String = "No text field activity"
+    @State private var lastAIActivity: String = "No AI activity"
 
     var body: some View {
         VStack(spacing: 20) {
             // Header
             VStack {
-                Image(systemName: "keyboard")
+                Image(systemName: "brain.head.profile")
                     .imageScale(.large)
-                    .foregroundStyle(.blue)
+                    .foregroundStyle(.purple)
                     .font(.system(size: 40))
 
                 Text("TypeWise AI")
                     .font(.title)
                     .fontWeight(.bold)
 
-                Text("Modules 1 & 2: Keyboard + Text Field Monitoring")
+                Text("Complete AI-Powered Writing Assistant")
                     .font(.caption)
                     .foregroundColor(.secondary)
             }
@@ -53,6 +56,20 @@ struct ContentView: View {
                         .font(.headline)
                 }
 
+                HStack {
+                    Circle()
+                        .fill(aiSuggestionEngine.isEnabled ? .green : .red)
+                        .frame(width: 10, height: 10)
+
+                    Text("AI Engine: \(aiSuggestionEngine.isEnabled ? "Running" : "Stopped")")
+                        .font(.headline)
+
+                    if aiSuggestionEngine.isProcessing {
+                        ProgressView()
+                            .scaleEffect(0.6)
+                    }
+                }
+
                 Text("Buffer: \(keyboardMonitor.bufferCharacterCount) chars, \(keyboardMonitor.bufferWordCount) words")
                     .font(.caption)
                     .foregroundColor(.secondary)
@@ -62,67 +79,114 @@ struct ContentView: View {
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
+
+                if aiSuggestionEngine.apiKeyConfigured {
+                    Text("AI: \(aiSuggestionEngine.totalSuggestionsGenerated) suggestions generated")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                } else {
+                    Text("AI: API key required (⌘I to configure)")
+                        .font(.caption)
+                        .foregroundColor(.orange)
+                }
             }
 
-            // Real-time Text Buffer
+            // Main Content Area
+            HStack(spacing: 20) {
+                // Left Column - Text Monitoring
+                VStack(alignment: .leading, spacing: 15) {
+                    // Real-time Keyboard Buffer
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Live Keyboard Buffer:")
+                            .font(.headline)
+
+                        ScrollView {
+                            Text(keyboardMonitor.currentText.isEmpty ? "Start typing anywhere..." : keyboardMonitor.currentText)
+                                .font(.system(.body, design: .monospaced))
+                                .foregroundColor(keyboardMonitor.currentText.isEmpty ? .secondary : .primary)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(8)
+                                .background(Color.gray.opacity(0.1))
+                                .cornerRadius(8)
+                        }
+                        .frame(height: 120)
+                    }
+
+                    // Text Field Content
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Focused Text Field Content:")
+                            .font(.headline)
+
+                        ScrollView {
+                            Text(textFieldReader.currentText.isEmpty ? "No text field focused..." : textFieldReader.currentText)
+                                .font(.system(.body, design: .monospaced))
+                                .foregroundColor(textFieldReader.currentText.isEmpty ? .secondary : .primary)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(8)
+                                .background(Color.orange.opacity(0.1))
+                                .cornerRadius(8)
+                        }
+                        .frame(height: 120)
+                    }
+                }
+                .frame(maxWidth: .infinity)
+
+                // Right Column - AI Suggestions
+                VStack(alignment: .leading, spacing: 15) {
+                    AISuggestionsView(suggestionEngine: aiSuggestionEngine)
+                        .frame(height: 280)
+                }
+                .frame(maxWidth: .infinity)
+            }
+
+            // Last Activities Summary
             VStack(alignment: .leading, spacing: 8) {
-                Text("Live Keyboard Buffer:")
+                Text("Recent Activity:")
                     .font(.headline)
 
-                ScrollView {
-                    Text(keyboardMonitor.currentText.isEmpty ? "Start typing anywhere..." : keyboardMonitor.currentText)
-                        .font(.system(.body, design: .monospaced))
-                        .foregroundColor(keyboardMonitor.currentText.isEmpty ? .secondary : .primary)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(8)
-                        .background(Color.gray.opacity(0.1))
-                        .cornerRadius(8)
+                HStack(spacing: 15) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Keyboard Trigger:")
+                            .font(.caption)
+                            .fontWeight(.medium)
+
+                        Text(lastSuggestionText)
+                            .font(.system(.caption, design: .monospaced))
+                            .foregroundColor(.blue)
+                            .padding(6)
+                            .background(Color.blue.opacity(0.1))
+                            .cornerRadius(6)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Text Field Change:")
+                            .font(.caption)
+                            .fontWeight(.medium)
+
+                        Text(lastTextFieldChange)
+                            .font(.system(.caption, design: .monospaced))
+                            .foregroundColor(.orange)
+                            .padding(6)
+                            .background(Color.orange.opacity(0.1))
+                            .cornerRadius(6)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("AI Activity:")
+                            .font(.caption)
+                            .fontWeight(.medium)
+
+                        Text(lastAIActivity)
+                            .font(.system(.caption, design: .monospaced))
+                            .foregroundColor(.purple)
+                            .padding(6)
+                            .background(Color.purple.opacity(0.1))
+                            .cornerRadius(6)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
                 }
-                .frame(height: 120)
-            }
-
-            // Text Field Content
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Focused Text Field Content:")
-                    .font(.headline)
-
-                ScrollView {
-                    Text(textFieldReader.currentText.isEmpty ? "No text field focused..." : textFieldReader.currentText)
-                        .font(.system(.body, design: .monospaced))
-                        .foregroundColor(textFieldReader.currentText.isEmpty ? .secondary : .primary)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(8)
-                        .background(Color.orange.opacity(0.1))
-                        .cornerRadius(8)
-                }
-                .frame(height: 120)
-            }
-
-            // Last Activities
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Last Suggestion Trigger:")
-                    .font(.subheadline)
-                    .fontWeight(.medium)
-
-                Text(lastSuggestionText)
-                    .font(.system(.caption, design: .monospaced))
-                    .foregroundColor(.blue)
-                    .padding(6)
-                    .background(Color.blue.opacity(0.1))
-                    .cornerRadius(6)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-
-                Text("Last Text Field Change:")
-                    .font(.subheadline)
-                    .fontWeight(.medium)
-
-                Text(lastTextFieldChange)
-                    .font(.system(.caption, design: .monospaced))
-                    .foregroundColor(.orange)
-                    .padding(6)
-                    .background(Color.orange.opacity(0.1))
-                    .cornerRadius(6)
-                    .frame(maxWidth: .infinity, alignment: .leading)
             }
 
             // Control Buttons
@@ -151,16 +215,35 @@ struct ContentView: View {
                 }
                 .buttonStyle(.bordered)
 
+                Button(action: {
+                    if aiSuggestionEngine.isEnabled {
+                        aiSuggestionEngine.stopEngine()
+                    } else {
+                        aiSuggestionEngine.startEngine()
+                    }
+                }) {
+                    Text(aiSuggestionEngine.isEnabled ? "Stop AI" : "Start AI")
+                        .frame(minWidth: 100)
+                }
+                .buttonStyle(.bordered)
+                .disabled(!aiSuggestionEngine.apiKeyConfigured)
+
                 Button("Clear Buffer") {
                     keyboardMonitor.clearBuffer()
                 }
                 .buttonStyle(.bordered)
+
+                Button("AI Settings") {
+                    openAISettings()
+                }
+                .buttonStyle(.borderless)
+                .foregroundColor(.purple)
             }
 
             Spacer()
         }
         .padding()
-        .frame(minWidth: 450, minHeight: 600)
+        .frame(minWidth: 800, minHeight: 700)
         .onReceive(NotificationCenter.default.publisher(for: .suggestionTriggered)) { notification in
             if let text = notification.userInfo?["text"] as? String {
                 lastSuggestionText = text
@@ -172,9 +255,57 @@ struct ContentView: View {
                 lastTextFieldChange = "[\(appName)] \(text)"
             }
         }
+        .onReceive(NotificationCenter.default.publisher(for: .aiSuggestionsGenerated)) { notification in
+            if let suggestions = notification.userInfo?["suggestions"] as? [AISuggestion] {
+                lastAIActivity = "Generated \(suggestions.count) suggestions"
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .aiSuggestionApplied)) { notification in
+            if let success = notification.userInfo?["success"] as? Bool {
+                lastAIActivity = success ? "✅ Suggestion applied" : "❌ Application failed"
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .aiSuggestionError)) { notification in
+            if let error = notification.userInfo?["error"] as? AIServiceError {
+                lastAIActivity = "❌ Error: \(error.localizedDescription)"
+            }
+        }
+    }
+
+    private func openAISettings() {
+        // Open AI Settings window using NSApplication
+        Task { @MainActor in
+            guard let app = NSApplication.shared.delegate as? NSApplicationDelegate else { return }
+
+            // Create and show AI Settings window
+            let settingsWindow = NSWindow(
+                contentRect: NSRect(x: 0, y: 0, width: 600, height: 700),
+                styleMask: [.titled, .closable, .resizable],
+                backing: .buffered,
+                defer: false
+            )
+
+            settingsWindow.title = "AI Settings"
+            settingsWindow.contentView = NSHostingView(
+                rootView: AISettingsView(suggestionEngine: aiSuggestionEngine, aiService: aiService)
+            )
+            settingsWindow.center()
+            settingsWindow.makeKeyAndOrderFront(nil)
+        }
     }
 }
 
 #Preview {
-    ContentView(keyboardMonitor: KeyboardMonitor(), textFieldReader: TextFieldReader())
+    let keyboardMonitor = KeyboardMonitor()
+    let textFieldReader = TextFieldReader()
+    let textFieldIntegration = TextFieldIntegration(keyboardMonitor: keyboardMonitor, textFieldReader: textFieldReader)
+    let aiService = OpenAIService(apiKey: "test")
+    let aiSuggestionEngine = AISuggestionEngine(aiService: aiService, textFieldIntegration: textFieldIntegration)
+
+    return ContentView(
+        keyboardMonitor: keyboardMonitor,
+        textFieldReader: textFieldReader,
+        aiSuggestionEngine: aiSuggestionEngine,
+        aiService: aiService
+    )
 }
