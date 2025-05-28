@@ -13,13 +13,25 @@ class KeyboardMonitor: ObservableObject {
     private var eventTap: CFMachPort?
     private var runLoopSource: CFRunLoopSource?
 
-    // Text buffering
+    // Text buffering with size limits
     @Published var currentText: String = ""
     @Published var isMonitoring: Bool = false
-    private var textBuffer: String = ""
+    private var textBuffer: String = "" {
+        didSet {
+            // Limit buffer size to prevent memory issues
+            if textBuffer.count > maxBufferSize {
+                let startIndex = textBuffer.index(textBuffer.endIndex, offsetBy: -maxBufferSize + 100)
+                textBuffer = String(textBuffer[startIndex...])
+            }
+        }
+    }
     private var lastKeystrokeTime: Date = Date()
     private let suggestionDelay: TimeInterval = 1.5 // Delay before triggering suggestions
     private var suggestionTimer: Timer?
+
+    // Memory management
+    private let maxBufferSize = 1000 // Maximum characters in buffer
+    private let maxTextLength = 500 // Maximum text length for AI processing
 
     // Trigger conditions
     private let sentenceEndMarkers: Set<Character> = [".", "!", "?"]

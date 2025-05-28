@@ -164,6 +164,10 @@ class AISuggestionEngine: ObservableObject {
         guard text.count >= minimumTextLength else { return }
         guard text != lastProcessedText else { return }
 
+        // Smart triggering conditions
+        let shouldTrigger = evaluateTextForSuggestion(text)
+        guard shouldTrigger else { return }
+
         // Cancel any existing timer
         suggestionTimer?.invalidate()
 
@@ -173,6 +177,30 @@ class AISuggestionEngine: ObservableObject {
                 await self?.generateSuggestions(for: text)
             }
         }
+    }
+
+    private func evaluateTextForSuggestion(_ text: String) -> Bool {
+        // Don't process very short text
+        if text.count < minimumTextLength { return false }
+
+        // Don't process very long text (limit AI costs)
+        if text.count > 1000 { return false }
+
+        // Check if text ends with sentence-ending punctuation
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        let sentenceEnders: Set<Character> = [".", "!", "?"]
+        let endsWithPunctuation = sentenceEnders.contains(trimmed.last ?? " ")
+
+        // Check if text contains complete words (not just typing)
+        let wordCount = text.components(separatedBy: .whitespaces).filter { !$0.isEmpty }.count
+        let hasEnoughWords = wordCount >= 3
+
+        // Check for natural pause patterns
+        let hasNaturalBreak = text.contains(". ") || text.contains("? ") || text.contains("! ") ||
+                             text.contains("\n") || endsWithPunctuation
+
+        // Trigger if we have enough content and a natural break point
+        return hasEnoughWords && hasNaturalBreak
     }
 
     private func generateSuggestions(for text: String) async {

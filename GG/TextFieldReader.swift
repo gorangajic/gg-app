@@ -117,14 +117,45 @@ class TextFieldReader: ObservableObject {
     // MARK: - Private Methods
 
     private func checkAccessibilityPermissions() -> Bool {
-        let options: NSDictionary = [kAXTrustedCheckOptionPrompt.takeRetainedValue() as String: true]
-        let accessEnabled = AXIsProcessTrustedWithOptions(options)
+        // Check if we have accessibility permissions
+        let checkOptionPrompt = kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String
+        let options: CFDictionary = [checkOptionPrompt: true] as CFDictionary
+        let isAccessibilityEnabled = AXIsProcessTrustedWithOptions(options)
 
-        if !accessEnabled {
-            print("⚠️ TextFieldReader: Accessibility access not enabled. Please enable it in System Preferences.")
+        if !isAccessibilityEnabled {
+            DispatchQueue.main.async {
+                self.showAccessibilityAlert()
+            }
         }
 
-        return accessEnabled
+        return isAccessibilityEnabled
+    }
+
+    private func showAccessibilityAlert() {
+        let alert = NSAlert()
+        alert.messageText = "Accessibility Permission Required"
+        alert.informativeText = """
+        TypeWise AI needs accessibility permissions to read text from other applications.
+
+        Steps to enable:
+        1. System Preferences → Security & Privacy → Privacy
+        2. Select "Accessibility" from the left panel
+        3. Click the lock to make changes
+        4. Add or check "TypeWise AI" in the list
+
+        The app will work properly after you grant these permissions.
+        """
+        alert.alertStyle = .informational
+        alert.addButton(withTitle: "Open System Preferences")
+        alert.addButton(withTitle: "Cancel")
+
+        let response = alert.runModal()
+        if response == .alertFirstButtonReturn {
+            // Open System Preferences to Privacy & Security
+            if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility") {
+                NSWorkspace.shared.open(url)
+            }
+        }
     }
 
     private func checkFocusedTextField() {

@@ -8,6 +8,63 @@
 
 import Foundation
 import Combine
+import Security
+
+// MARK: - Keychain Helper for Secure API Key Storage
+
+class KeychainHelper {
+    private static let service = "com.typewise.ai"
+    private static let account = "openai-api-key"
+
+    static func save(apiKey: String) -> Bool {
+        let data = apiKey.data(using: .utf8)!
+
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: account,
+            kSecValueData as String: data
+        ]
+
+        // Delete existing item first
+        SecItemDelete(query as CFDictionary)
+
+        let status = SecItemAdd(query as CFDictionary, nil)
+        return status == errSecSuccess
+    }
+
+    static func load() -> String? {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: account,
+            kSecReturnData as String: true,
+            kSecMatchLimit as String: kSecMatchLimitOne
+        ]
+
+        var dataTypeRef: AnyObject?
+        let status = SecItemCopyMatching(query as CFDictionary, &dataTypeRef)
+
+        if status == errSecSuccess,
+           let data = dataTypeRef as? Data,
+           let apiKey = String(data: data, encoding: .utf8) {
+            return apiKey
+        }
+
+        return nil
+    }
+
+    static func delete() -> Bool {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: account
+        ]
+
+        let status = SecItemDelete(query as CFDictionary)
+        return status == errSecSuccess
+    }
+}
 
 // MARK: - AI Service Protocol
 
@@ -101,6 +158,7 @@ class OpenAIService: AIServiceProtocol, ObservableObject {
     @Published var requestCount = 0
     @Published var totalTokensUsed = 0
     @Published var isAPIKeyConfigured = false
+    @Published var cacheHitRate: Double = 0.0
 
     // MARK: - Private Properties
     private var apiKey: String {
@@ -113,11 +171,25 @@ class OpenAIService: AIServiceProtocol, ObservableObject {
     private let model = "gpt-3.5-turbo"
     private let maxTokens = 500
 
+    // MARK: - Caching
+    private var suggestionCache = [String: AISuggestionResponse]()
+    private var cacheHits = 0
+    private var totalRequests = 0
+    private let maxCacheSize = 100
+    private let cacheExpiryTime: TimeInterval = 300 // 5 minutes
+
     // MARK: - Initialization
 
     init(apiKey: String) {
-        self.apiKey = apiKey
-        self.isAPIKeyConfigured = !apiKey.isEmpty
+        // Load API key from Keychain if empty
+        if apiKey.isEmpty {
+            self.apiKey = KeychainHelper.load() ?? ""
+        } else {
+            self.apiKey = apiKey
+            // Save to Keychain
+            _ = KeychainHelper.save(apiKey: apiKey)
+        }
+        self.isAPIKeyConfigured = !self.apiKey.isEmpty
     }
 
     // MARK: - Public Methods
@@ -130,6 +202,19 @@ class OpenAIService: AIServiceProtocol, ObservableObject {
     }
 
     func generateSuggestions(for text: String, context: AIContext) async throws -> AISuggestionResponse {
+        totalRequests += 1
+
+        // Check cache first
+        let cacheKey = "\(text.hashValue)-\(context.appName)"
+        if let cachedResponse = suggestionCache[cacheKey] {
+            cacheHits += 1
+            DispatchQueue.main.async {
+                self.cacheHitRate = Double(self.cacheHits) / Double(self.totalRequests)
+            }
+            print("📋 Cache hit for text: \(text.prefix(50))...")
+            return cachedResponse
+        }
+
         let startTime = Date()
 
         DispatchQueue.main.async {
@@ -144,21 +229,43 @@ class OpenAIService: AIServiceProtocol, ObservableObject {
         }
 
         let prompt = buildSuggestionPrompt(text: text, context: context)
-        let response = try await makeOpenAIRequest(prompt: prompt)
 
-        let suggestions = try parseSuggestionsResponse(response, originalText: text)
-        let processingTime = Date().timeIntervalSince(startTime)
+        // Retry logic
+        var lastError: Error?
+        for attempt in 1...3 {
+            do {
+                let response = try await makeOpenAIRequestWithRetry(prompt: prompt, attempt: attempt)
+                let suggestions = try parseSuggestionsResponse(response, originalText: text)
+                let processingTime = Date().timeIntervalSince(startTime)
 
-        DispatchQueue.main.async {
-            self.requestCount += 1
+                let result = AISuggestionResponse(
+                    original: text,
+                    suggestions: suggestions,
+                    confidence: calculateOverallConfidence(suggestions),
+                    processingTime: processingTime
+                )
+
+                // Cache the result
+                cacheResult(key: cacheKey, response: result)
+
+                DispatchQueue.main.async {
+                    self.requestCount += 1
+                    self.cacheHitRate = Double(self.cacheHits) / Double(self.totalRequests)
+                }
+
+                return result
+
+            } catch {
+                lastError = error
+                if attempt < 3 {
+                    let delay = pow(2.0, Double(attempt)) // Exponential backoff
+                    try await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
+                    print("⚠️ Retry attempt \(attempt + 1) after \(delay)s delay")
+                }
+            }
         }
 
-        return AISuggestionResponse(
-            original: text,
-            suggestions: suggestions,
-            confidence: calculateOverallConfidence(suggestions),
-            processingTime: processingTime
-        )
+        throw lastError ?? AIServiceError.networkError(NSError(domain: "Unknown", code: -1))
     }
 
     func improveGrammar(for text: String) async throws -> AIImprovementResponse {
@@ -345,6 +452,43 @@ class OpenAIService: AIServiceProtocol, ObservableObject {
     private func calculateOverallConfidence(_ suggestions: [AISuggestion]) -> Double {
         guard !suggestions.isEmpty else { return 0.0 }
         return suggestions.map { $0.confidence }.reduce(0, +) / Double(suggestions.count)
+    }
+
+    private func cacheResult(key: String, response: AISuggestionResponse) {
+        suggestionCache[key] = response
+
+        // Prevent cache from growing too large
+        if suggestionCache.count > maxCacheSize {
+            let oldestKey = suggestionCache.keys.randomElement()!
+            suggestionCache.removeValue(forKey: oldestKey)
+        }
+    }
+
+    private func makeOpenAIRequestWithRetry(prompt: String, attempt: Int) async throws -> String {
+        do {
+            return try await makeOpenAIRequest(prompt: prompt)
+        } catch {
+            // Log specific error types for better debugging
+            if let aiError = error as? AIServiceError {
+                switch aiError {
+                case .rateLimitExceeded:
+                    print("🚫 Rate limit exceeded on attempt \(attempt)")
+                    if attempt < 3 {
+                        // Wait longer for rate limits
+                        try await Task.sleep(nanoseconds: UInt64(5 * 1_000_000_000))
+                    }
+                case .apiError(let statusCode, let message):
+                    print("❌ API error \(statusCode): \(message)")
+                case .networkError(let underlyingError):
+                    print("🌐 Network error: \(underlyingError.localizedDescription)")
+                case .invalidAPIKey:
+                    print("🔑 Invalid API key")
+                case .invalidResponse:
+                    print("📄 Invalid response format")
+                }
+            }
+            throw error
+        }
     }
 }
 

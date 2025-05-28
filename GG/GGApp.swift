@@ -7,6 +7,42 @@
 
 import SwiftUI
 
+// MARK: - Settings Manager
+
+class SettingsManager: ObservableObject {
+    @Published var apiKey: String {
+        didSet {
+            if !apiKey.isEmpty {
+                _ = KeychainHelper.save(apiKey: apiKey)
+            }
+        }
+    }
+
+    @Published var autoTriggerEnabled: Bool {
+        didSet { UserDefaults.standard.set(autoTriggerEnabled, forKey: "autoTriggerEnabled") }
+    }
+
+    @Published var minimumTextLength: Int {
+        didSet { UserDefaults.standard.set(minimumTextLength, forKey: "minimumTextLength") }
+    }
+
+    @Published var suggestionDelay: Double {
+        didSet { UserDefaults.standard.set(suggestionDelay, forKey: "suggestionDelay") }
+    }
+
+    @Published var maxSuggestions: Int {
+        didSet { UserDefaults.standard.set(maxSuggestions, forKey: "maxSuggestions") }
+    }
+
+    init() {
+        self.apiKey = KeychainHelper.load() ?? ""
+        self.autoTriggerEnabled = UserDefaults.standard.object(forKey: "autoTriggerEnabled") as? Bool ?? true
+        self.minimumTextLength = UserDefaults.standard.object(forKey: "minimumTextLength") as? Int ?? 15
+        self.suggestionDelay = UserDefaults.standard.object(forKey: "suggestionDelay") as? Double ?? 2.0
+        self.maxSuggestions = UserDefaults.standard.object(forKey: "maxSuggestions") as? Int ?? 5
+    }
+}
+
 @main
 struct GGApp: App {
     @StateObject private var keyboardMonitor = KeyboardMonitor()
