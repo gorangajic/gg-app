@@ -132,12 +132,122 @@ class AppDelegate: NSObject, ObservableObject, KeyboardMonitorDelegate, TextFiel
     // References to main components
     private var keyboardMonitor: KeyboardMonitor?
     private var textFieldReader: TextFieldReader?
-    private var aiSuggestionEngine: AISuggestionEngine?
+    public var aiSuggestionEngine: AISuggestionEngine?
+
+    // Module 4: Suggestion UI Overlay
+    private var suggestionOverlay: SuggestionOverlayWindow?
+    private var overlayAutoHideTimer: Timer?
+
+    // Public accessors for status checking
+    public var isKeyboardMonitoring: Bool {
+        return keyboardMonitor?.isMonitoring ?? false
+    }
+
+    public var isTextFieldReading: Bool {
+        return textFieldReader?.isActive ?? false
+    }
+
+    public var isAIEngineRunning: Bool {
+        return aiSuggestionEngine?.isEnabled ?? false
+    }
+
+    override init() {
+        super.init()
+        setupSuggestionOverlay()
+        setupOverlayNotifications()
+    }
 
     func setupReferences(keyboardMonitor: KeyboardMonitor, textFieldReader: TextFieldReader, aiSuggestionEngine: AISuggestionEngine) {
         self.keyboardMonitor = keyboardMonitor
         self.textFieldReader = textFieldReader
         self.aiSuggestionEngine = aiSuggestionEngine
+    }
+
+    // MARK: - Module 4: Suggestion Overlay Management
+
+    private func setupSuggestionOverlay() {
+        suggestionOverlay = SuggestionOverlayWindow()
+        print("✅ Module 4: Suggestion overlay window created")
+    }
+
+    private func setupOverlayNotifications() {
+        // Listen for hide overlay notifications
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(hideSuggestionOverlay),
+            name: .hideSuggestionOverlay,
+            object: nil
+        )
+
+        // Listen for apply suggestion notifications from overlay
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(applySuggestionFromOverlay(_:)),
+            name: .applySuggestionFromOverlay,
+            object: nil
+        )
+    }
+
+    @objc private func hideSuggestionOverlay() {
+        suggestionOverlay?.hideOverlay()
+        cancelAutoHideTimer()
+        print("🔽 Module 4: Suggestion overlay hidden")
+    }
+
+    @objc private func applySuggestionFromOverlay(_ notification: Notification) {
+        guard let suggestion = notification.userInfo?["suggestion"] as? AISuggestion else { return }
+
+        // Apply the suggestion through the AI engine
+        aiSuggestionEngine?.applySuggestion(suggestion)
+        print("✅ Module 4: Applied suggestion from overlay: \(suggestion.type.rawValue)")
+    }
+
+    private func showSuggestionOverlay(with suggestions: [AISuggestion]) {
+        guard !suggestions.isEmpty else { return }
+
+        // Get current cursor position
+        let cursorPosition = getCursorPosition()
+
+        // Show overlay near cursor
+        suggestionOverlay?.showNear(cursor: cursorPosition, with: suggestions)
+
+        // Set up auto-hide timer (hide after 10 seconds of inactivity)
+        setupAutoHideTimer()
+
+        print("🔼 Module 4: Suggestion overlay shown with \(suggestions.count) suggestions")
+    }
+
+    private func getCursorPosition() -> NSPoint {
+        // Try to get the actual text field position for more accurate positioning
+        if let textFieldReader = textFieldReader,
+           let elementInfo = textFieldReader.getFocusedElementInfo(),
+           let positionValue = elementInfo["position"] as? NSValue {
+
+            let elementPosition = positionValue.pointValue
+
+            // For text fields, position the overlay near the top-right of the field
+            // This gives a better user experience than using mouse position
+            return NSPoint(x: elementPosition.x + 100, y: elementPosition.y + 20)
+        }
+
+        // Fallback to mouse location if we can't get text field position
+        let mouseLocation = NSEvent.mouseLocation
+
+        // In a real implementation, you might want to get the actual text cursor position
+        // For now, we'll use mouse location as a reasonable approximation
+        return mouseLocation
+    }
+
+    private func setupAutoHideTimer() {
+        cancelAutoHideTimer()
+        overlayAutoHideTimer = Timer.scheduledTimer(withTimeInterval: 10.0, repeats: false) { [weak self] _ in
+            self?.hideSuggestionOverlay()
+        }
+    }
+
+    private func cancelAutoHideTimer() {
+        overlayAutoHideTimer?.invalidate()
+        overlayAutoHideTimer = nil
     }
 
     // MARK: - KeyboardMonitorDelegate
@@ -173,6 +283,9 @@ class AppDelegate: NSObject, ObservableObject, KeyboardMonitorDelegate, TextFiel
     func textFieldReader(_ reader: TextFieldReader, didLoseFocus previousText: String) {
         print("📝 Text field lost focus. Previous text: '\(previousText)'")
 
+        // Hide overlay when text field loses focus
+        hideSuggestionOverlay()
+
         // Post notification for focus loss
         NotificationCenter.default.post(
             name: .textFieldLostFocus,
@@ -186,6 +299,9 @@ class AppDelegate: NSObject, ObservableObject, KeyboardMonitorDelegate, TextFiel
     func suggestionEngine(_ engine: AISuggestionEngine, didGenerateSuggestions suggestions: [AISuggestion]) {
         print("🤖 AI generated \(suggestions.count) suggestions")
 
+        // Module 4: Show suggestion overlay with generated suggestions
+        showSuggestionOverlay(with: suggestions)
+
         // Post notification for UI updates
         NotificationCenter.default.post(
             name: .aiSuggestionsGenerated,
@@ -196,6 +312,9 @@ class AppDelegate: NSObject, ObservableObject, KeyboardMonitorDelegate, TextFiel
 
     func suggestionEngine(_ engine: AISuggestionEngine, didFailWithError error: AIServiceError) {
         print("❌ AI suggestion failed: \(error.localizedDescription)")
+
+        // Hide overlay on error
+        hideSuggestionOverlay()
 
         // Post notification for error handling
         NotificationCenter.default.post(
@@ -208,6 +327,11 @@ class AppDelegate: NSObject, ObservableObject, KeyboardMonitorDelegate, TextFiel
     func suggestionEngine(_ engine: AISuggestionEngine, didApplySuggestion suggestion: AISuggestion, success: Bool) {
         print(success ? "✅ Applied AI suggestion" : "❌ Failed to apply AI suggestion")
 
+        // Hide overlay after applying suggestion
+        if success {
+            hideSuggestionOverlay()
+        }
+
         // Post notification for suggestion application
         NotificationCenter.default.post(
             name: .aiSuggestionApplied,
@@ -217,6 +341,13 @@ class AppDelegate: NSObject, ObservableObject, KeyboardMonitorDelegate, TextFiel
                 "success": success
             ]
         )
+    }
+
+    // MARK: - Cleanup
+
+    deinit {
+        NotificationCenter.default.removeObserver(self)
+        cancelAutoHideTimer()
     }
 }
 

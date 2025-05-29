@@ -485,6 +485,8 @@ class OpenAIService: AIServiceProtocol, ObservableObject {
                     print("🔑 Invalid API key")
                 case .invalidResponse:
                     print("📄 Invalid response format")
+                case .quotaExceeded:
+                    print("💰 API quota exceeded")
                 }
             }
             throw error
