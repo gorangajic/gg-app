@@ -11,7 +11,7 @@ import Cocoa
 
 class SuggestionTriggerButton: NSPanel {
     private var hostingView: NSHostingView<SuggestionButtonView>?
-    private weak var delegate: SuggestionTriggerDelegate?
+    private weak var suggestionDelegate: SuggestionTriggerDelegate?
 
     // Track text field position for smart positioning
     private var lastTextFieldPosition: NSPoint = NSPoint.zero
@@ -60,7 +60,7 @@ class SuggestionTriggerButton: NSPanel {
     }
 
     func setDelegate(_ delegate: SuggestionTriggerDelegate) {
-        self.delegate = delegate
+        self.suggestionDelegate = delegate
     }
 
     func showNear(textField position: NSPoint, size: NSSize) {
@@ -134,7 +134,7 @@ class SuggestionTriggerButton: NSPanel {
     }
 
     private func triggerSuggestion() {
-        delegate?.suggestionTriggerButtonPressed()
+        suggestionDelegate?.suggestionTriggerButtonPressed()
         hideButton() // Hide after triggering
     }
 }
