@@ -84,6 +84,11 @@ struct ContentView: View {
                     Text("AI: \(aiSuggestionEngine.totalSuggestionsGenerated) suggestions generated")
                         .font(.caption)
                         .foregroundColor(.secondary)
+
+                    Text("Mode: Manual trigger (button appears near text fields)")
+                        .font(.caption)
+                        .foregroundColor(.blue)
+                        .italic()
                 } else {
                     Text("AI: API key required (⌘I to configure)")
                         .font(.caption)
@@ -238,6 +243,13 @@ struct ContentView: View {
                 }
                 .buttonStyle(.borderless)
                 .foregroundColor(.purple)
+
+                Button("Test Manual Trigger") {
+                    aiSuggestionEngine.generateSuggestionsManually()
+                }
+                .buttonStyle(.borderless)
+                .foregroundColor(.blue)
+                .disabled(!aiSuggestionEngine.isEnabled || !aiSuggestionEngine.apiKeyConfigured)
             }
 
             Spacer()

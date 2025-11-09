@@ -93,6 +93,16 @@ class AISuggestionEngine: ObservableObject {
         }
     }
 
+    func generateSuggestionsManually(for text: String) async {
+        guard isEnabled else { return }
+        guard !text.isEmpty && text.count >= minimumTextLength else {
+            print("⚠️ Text too short for suggestions: \(text.count) characters")
+            return
+        }
+
+        await generateSuggestions(for: text)
+    }
+
     func applySuggestion(_ suggestion: AISuggestion) {
         let success = textFieldIntegration.insertAISuggestion(suggestion.suggestedText, replaceExisting: true)
 
@@ -126,6 +136,13 @@ class AISuggestionEngine: ObservableObject {
         DispatchQueue.main.async {
             self.apiKeyConfigured = !apiKey.isEmpty
         }
+    }
+
+    func setAutoTriggerEnabled(_ enabled: Bool) {
+        DispatchQueue.main.async {
+            self.autoTriggerEnabled = enabled
+        }
+        print("🔧 Auto-trigger \(enabled ? "enabled" : "disabled")")
     }
 
     // MARK: - Private Methods

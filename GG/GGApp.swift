@@ -126,7 +126,7 @@ struct GGApp: App {
 
 // MARK: - App Delegate
 
-class AppDelegate: NSObject, ObservableObject, KeyboardMonitorDelegate, TextFieldReaderDelegate, AISuggestionEngineDelegate {
+class AppDelegate: NSObject, ObservableObject, KeyboardMonitorDelegate, TextFieldReaderDelegate, AISuggestionEngineDelegate, SuggestionTriggerDelegate {
     static let shared = AppDelegate()
 
     // References to main components
@@ -137,6 +137,10 @@ class AppDelegate: NSObject, ObservableObject, KeyboardMonitorDelegate, TextFiel
     // Module 4: Suggestion UI Overlay
     private var suggestionOverlay: SuggestionOverlayWindow?
     private var overlayAutoHideTimer: Timer?
+
+    // Manual Suggestion Trigger Button
+    private var suggestionTriggerButton: SuggestionTriggerButton?
+    private var buttonAutoHideTimer: Timer?
 
     // Public accessors for status checking
     public var isKeyboardMonitoring: Bool {
@@ -154,6 +158,7 @@ class AppDelegate: NSObject, ObservableObject, KeyboardMonitorDelegate, TextFiel
     override init() {
         super.init()
         setupSuggestionOverlay()
+        setupSuggestionTriggerButton()
         setupOverlayNotifications()
     }
 
@@ -161,6 +166,9 @@ class AppDelegate: NSObject, ObservableObject, KeyboardMonitorDelegate, TextFiel
         self.keyboardMonitor = keyboardMonitor
         self.textFieldReader = textFieldReader
         self.aiSuggestionEngine = aiSuggestionEngine
+
+        // Disable automatic triggering in AI engine
+        aiSuggestionEngine.setAutoTriggerEnabled(false)
     }
 
     // MARK: - Module 4: Suggestion Overlay Management
@@ -168,6 +176,14 @@ class AppDelegate: NSObject, ObservableObject, KeyboardMonitorDelegate, TextFiel
     private func setupSuggestionOverlay() {
         suggestionOverlay = SuggestionOverlayWindow()
         print("✅ Module 4: Suggestion overlay window created")
+    }
+
+    // MARK: - Manual Suggestion Trigger Button
+
+    private func setupSuggestionTriggerButton() {
+        suggestionTriggerButton = SuggestionTriggerButton()
+        suggestionTriggerButton?.setDelegate(self)
+        print("✅ Manual suggestion trigger button created")
     }
 
     private func setupOverlayNotifications() {
@@ -253,9 +269,12 @@ class AppDelegate: NSObject, ObservableObject, KeyboardMonitorDelegate, TextFiel
     // MARK: - KeyboardMonitorDelegate
 
     func keyboardMonitor(_ monitor: KeyboardMonitor, didTriggerSuggestion text: String) {
-        print("📝 App received suggestion trigger: '\(text)'")
+        print("📝 Keyboard activity detected: '\(text)' (manual mode - no auto-trigger)")
 
-        // Post notification for other components
+        // In manual mode, we only log keyboard activity but don't auto-trigger
+        // Users must click the suggestion button to get AI help
+
+        // Post notification for other components (like status displays)
         NotificationCenter.default.post(
             name: .suggestionTriggered,
             object: nil,
@@ -267,6 +286,21 @@ class AppDelegate: NSObject, ObservableObject, KeyboardMonitorDelegate, TextFiel
 
     func textFieldReader(_ reader: TextFieldReader, didDetectTextChange text: String, in element: AXUIElement) {
         print("📝 Text field content changed: '\(text)' in app: \(reader.focusedAppName)")
+
+        // Show suggestion button near the focused text field (only if text has sufficient length)
+        if text.count >= 10 { // Only show button if there's meaningful text
+            if let elementInfo = reader.getFocusedElementInfo(),
+               let positionValue = elementInfo["position"] as? NSValue,
+               let sizeValue = elementInfo["size"] as? NSValue {
+
+                let position = positionValue.pointValue
+                let size = sizeValue.sizeValue
+
+                showSuggestionButton(near: position, size: size)
+            }
+        } else {
+            hideSuggestionButton()
+        }
 
         // Post notification for text field changes
         NotificationCenter.default.post(
@@ -283,7 +317,8 @@ class AppDelegate: NSObject, ObservableObject, KeyboardMonitorDelegate, TextFiel
     func textFieldReader(_ reader: TextFieldReader, didLoseFocus previousText: String) {
         print("📝 Text field lost focus. Previous text: '\(previousText)'")
 
-        // Hide overlay when text field loses focus
+        // Hide both suggestion button and overlay when text field loses focus
+        hideSuggestionButton()
         hideSuggestionOverlay()
 
         // Post notification for focus loss
@@ -343,11 +378,67 @@ class AppDelegate: NSObject, ObservableObject, KeyboardMonitorDelegate, TextFiel
         )
     }
 
+    // MARK: - SuggestionTriggerDelegate
+
+    func suggestionTriggerButtonPressed() {
+        print("🔵 Manual suggestion trigger button pressed")
+
+        // Get current text for AI processing
+        guard let textFieldReader = textFieldReader else { return }
+
+        let textToProcess: String
+        if !textFieldReader.currentText.isEmpty {
+            textToProcess = textFieldReader.currentText
+        } else if let keyboardMonitor = keyboardMonitor, !keyboardMonitor.currentText.isEmpty {
+            textToProcess = keyboardMonitor.currentText
+        } else {
+            print("❌ No text available for suggestion generation")
+            return
+        }
+
+        // Manually trigger AI suggestion generation
+        Task {
+            await aiSuggestionEngine?.generateSuggestionsManually(for: textToProcess)
+        }
+    }
+
+    private func showSuggestionButton(near textFieldPosition: NSPoint, size textFieldSize: NSSize) {
+        // Cancel any existing auto-hide timer
+        cancelButtonAutoHideTimer()
+
+        // Show the trigger button
+        suggestionTriggerButton?.showNear(textField: textFieldPosition, size: textFieldSize)
+
+        // Set up auto-hide timer (hide after 8 seconds of inactivity)
+        setupButtonAutoHideTimer()
+
+        print("🔵 Suggestion trigger button shown near text field")
+    }
+
+    private func hideSuggestionButton() {
+        suggestionTriggerButton?.hideButton()
+        cancelButtonAutoHideTimer()
+        print("🔵 Suggestion trigger button hidden")
+    }
+
+    private func setupButtonAutoHideTimer() {
+        cancelButtonAutoHideTimer()
+        buttonAutoHideTimer = Timer.scheduledTimer(withTimeInterval: 8.0, repeats: false) { [weak self] _ in
+            self?.hideSuggestionButton()
+        }
+    }
+
+    private func cancelButtonAutoHideTimer() {
+        buttonAutoHideTimer?.invalidate()
+        buttonAutoHideTimer = nil
+    }
+
     // MARK: - Cleanup
 
     deinit {
         NotificationCenter.default.removeObserver(self)
         cancelAutoHideTimer()
+        cancelButtonAutoHideTimer()
     }
 }
 
