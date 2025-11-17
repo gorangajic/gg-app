@@ -1,0 +1,14 @@
+{
+  "name": "gg-app-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "description": "GG App Monorepo - Mac App, Browser Extension, and Server",
+  "workspaces": [
+    "mac-app",
+    "browser-extension",
+    "server"
+  ],
+  "scripts": {
+    "postinstall": "echo 'Monorepo setup complete'"
+  }
+}
