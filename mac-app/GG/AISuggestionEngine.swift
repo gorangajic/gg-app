@@ -266,10 +266,10 @@ class AISuggestionEngine: ObservableObject {
         }
     }
 
-    private func buildAIContext(for text: String) -> AIContext {
+    private func buildAIContext(for text: String) -> LocalAIContext {
         let analysisContext = textFieldIntegration.getAnalysisContext()
 
-        return AIContext(
+        return LocalAIContext(
             appName: analysisContext.appName,
             fieldType: analysisContext.textFieldInfo?["role"] as? String,
             textLength: text.count

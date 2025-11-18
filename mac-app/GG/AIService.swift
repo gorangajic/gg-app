@@ -84,14 +84,14 @@ class KeychainHelper {
 // MARK: - AI Service Protocol
 
 protocol AIServiceProtocol {
-    func generateSuggestions(for text: String, context: AIContext) async throws -> AISuggestionResponse
+    func generateSuggestions(for text: String, context: LocalAIContext) async throws -> AISuggestionResponse
     func improveGrammar(for text: String) async throws -> AIImprovementResponse
     func rewriteText(_ text: String, style: AIRewriteStyle) async throws -> AIRewriteResponse
 }
 
 // MARK: - AI Context
 
-struct AIContext {
+struct LocalAIContext {
     let appName: String
     let fieldType: String?
     let textLength: Int
@@ -216,7 +216,7 @@ class OpenAIService: AIServiceProtocol, ObservableObject {
         print("🔑 OpenAIService: API key updated")
     }
 
-    func generateSuggestions(for text: String, context: AIContext) async throws -> AISuggestionResponse {
+    func generateSuggestions(for text: String, context: LocalAIContext) async throws -> AISuggestionResponse {
         totalRequests += 1
 
         // Check cache first
@@ -343,7 +343,7 @@ class OpenAIService: AIServiceProtocol, ObservableObject {
 
     // MARK: - Private Methods
 
-    private func buildSuggestionPrompt(text: String, context: AIContext) -> String {
+    private func buildSuggestionPrompt(text: String, context: LocalAIContext) -> String {
         return """
         You are a writing assistant. Analyze the following text and provide specific suggestions for improvement.
         \(context.contextPrompt)
