@@ -8,9 +8,5 @@
 	<true/>
 	<key>com.apple.security.network.client</key>
 	<true/>
-	<key>com.apple.developer.associated-domains</key>
-	<array>
-		<string>applinks:yourdomain.com</string>
-	</array>
 </dict>
 </plist>
