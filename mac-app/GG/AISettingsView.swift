@@ -11,10 +11,12 @@ import SwiftUI
 struct AISettingsView: View {
     @ObservedObject var suggestionEngine: AISuggestionEngine
     @ObservedObject var aiService: ServerAIService
+    @EnvironmentObject var authCoordinator: AuthenticationCoordinator
     @State private var showingTestResults = false
     @State private var testResultMessage = ""
     @State private var isTestingConnection = false
     @State private var serverURL: String = ""
+    @State private var showAuthSheet = false
 
     var body: some View {
         VStack(spacing: 25) {
@@ -58,6 +60,28 @@ struct AISettingsView: View {
                                     .font(.caption)
                                     .foregroundColor(.secondary)
                             }
+                        }
+
+                        if !aiService.isAuthenticated {
+                            Text("You must sign in to use AI features")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                                .padding(.top, 4)
+
+                            HStack(spacing: 10) {
+                                Button("Sign In") {
+                                    authCoordinator.openBrowserForLogin()
+                                }
+                                .buttonStyle(.borderedProminent)
+                                .controlSize(.small)
+
+                                Button("Create Account") {
+                                    authCoordinator.openBrowserForRegistration()
+                                }
+                                .buttonStyle(.bordered)
+                                .controlSize(.small)
+                            }
+                            .padding(.top, 8)
                         }
                     }
 
@@ -109,7 +133,7 @@ struct AISettingsView: View {
                         Button(suggestionEngine.isEnabled ? "Stop Engine" : "Start Engine") {
                             toggleEngine()
                         }
-                        .disabled(!suggestionEngine.apiKeyConfigured)
+                        .disabled(!aiService.isAuthenticated)
                         .buttonStyle(.borderedProminent)
                     }
 
@@ -231,7 +255,7 @@ struct AISettingsView: View {
                 Button("Generate Now") {
                     suggestionEngine.generateSuggestionsManually()
                 }
-                .disabled(!suggestionEngine.isEnabled)
+                .disabled(!suggestionEngine.isEnabled || !aiService.isAuthenticated)
                 .buttonStyle(.bordered)
 
                 Button("Clear Suggestions") {
@@ -246,7 +270,7 @@ struct AISettingsView: View {
                         }
                     }
                 }
-                .disabled(!suggestionEngine.isEnabled)
+                .disabled(!suggestionEngine.isEnabled || !aiService.isAuthenticated)
                 .buttonStyle(.bordered)
             }
 
@@ -325,4 +349,5 @@ struct AISettingsView: View {
     )
 
     return AISettingsView(suggestionEngine: mockEngine, aiService: mockService)
+        .environmentObject(AuthenticationCoordinator())
 }
