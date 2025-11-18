@@ -293,7 +293,7 @@ struct ConfidenceBadge: View {
         )
     ]
 
-    let mockService = OpenAIService(apiKey: "test")
+    let mockService = ServerAIService()
     let mockIntegration = TextFieldIntegration(
         keyboardMonitor: KeyboardMonitor(),
         textFieldReader: TextFieldReader()

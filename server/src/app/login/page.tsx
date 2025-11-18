@@ -1,3 +1,5 @@
+'use client';
+
 export default function LoginPage() {
   return (
     <main style={{
@@ -120,16 +122,8 @@ export default function LoginPage() {
               throw new Error(data.error || 'Login failed');
             }
 
-            // Redirect to Mac app with token
-            window.location.href = 'ggapp://auth?token=' + encodeURIComponent(data.token);
-
-            // Show success message in case redirect doesn't work
-            submitButton.textContent = 'Success! Opening app...';
-            setTimeout(() => {
-              errorDiv.style.display = 'block';
-              errorDiv.style.color = '#2e7d32';
-              errorDiv.textContent = 'If the app did not open, copy this token: ' + data.token;
-            }, 2000);
+            // Redirect to success page which will handle app opening and troubleshooting
+            window.location.href = '/auth-success?token=' + encodeURIComponent(data.token);
 
           } catch (error) {
             errorDiv.style.display = 'block';

@@ -10,12 +10,13 @@ import SwiftUI
 
 struct AISettingsView: View {
     @ObservedObject var suggestionEngine: AISuggestionEngine
-    @ObservedObject var aiService: OpenAIService
-    @State private var apiKey: String = ""
-    @State private var showingAPIKeyAlert = false
+    @ObservedObject var aiService: ServerAIService
+    @EnvironmentObject var authCoordinator: AuthenticationCoordinator
     @State private var showingTestResults = false
     @State private var testResultMessage = ""
     @State private var isTestingConnection = false
+    @State private var serverURL: String = ""
+    @State private var showAuthSheet = false
 
     var body: some View {
         VStack(spacing: 25) {
@@ -30,7 +31,7 @@ struct AISettingsView: View {
                     .font(.title)
                     .fontWeight(.bold)
 
-                Text("Configure OpenAI integration and suggestion preferences")
+                Text("Configure server connection and suggestion preferences")
                     .font(.caption)
                     .foregroundColor(.secondary)
                     .multilineTextAlignment(.center)
@@ -38,43 +39,79 @@ struct AISettingsView: View {
 
             Divider()
 
-            // API Configuration
-            GroupBox(label: Label("OpenAI Configuration", systemImage: "key")) {
+            // Server Configuration
+            GroupBox(label: Label("Server Connection", systemImage: "server.rack")) {
                 VStack(alignment: .leading, spacing: 15) {
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("API Key:")
+                        Text("Authentication Status:")
                             .font(.headline)
 
                         HStack {
-                            SecureField("Enter your OpenAI API key", text: $apiKey)
+                            Label(
+                                aiService.isAuthenticated ? "Authenticated" : "Not Authenticated",
+                                systemImage: aiService.isAuthenticated ? "checkmark.circle.fill" : "exclamationmark.triangle.fill"
+                            )
+                            .foregroundColor(aiService.isAuthenticated ? .green : .orange)
+
+                            Spacer()
+
+                            if let user = aiService.currentUser {
+                                Text(user.email)
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                        }
+
+                        if !aiService.isAuthenticated {
+                            Text("You must sign in to use AI features")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                                .padding(.top, 4)
+
+                            HStack(spacing: 10) {
+                                Button("Sign In") {
+                                    authCoordinator.openBrowserForLogin()
+                                }
+                                .buttonStyle(.borderedProminent)
+                                .controlSize(.small)
+
+                                Button("Create Account") {
+                                    authCoordinator.openBrowserForRegistration()
+                                }
+                                .buttonStyle(.bordered)
+                                .controlSize(.small)
+                            }
+                            .padding(.top, 8)
+                        }
+                    }
+
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Server URL:")
+                            .font(.headline)
+
+                        HStack {
+                            TextField("Server URL", text: $serverURL)
                                 .textFieldStyle(.roundedBorder)
 
-                            Button("Save") {
-                                saveAPIKey()
+                            Button("Update") {
+                                updateServerURL()
                             }
-                            .disabled(apiKey.isEmpty)
+                            .disabled(serverURL.isEmpty)
                             .buttonStyle(.borderedProminent)
                         }
 
-                        Text("Get your API key from: https://platform.openai.com/api-keys")
+                        Text("Current: \(aiService.getServerURL())")
                             .font(.caption)
                             .foregroundColor(.secondary)
                     }
 
                     HStack {
-                        Label(
-                            suggestionEngine.apiKeyConfigured ? "API Key Configured" : "API Key Required",
-                            systemImage: suggestionEngine.apiKeyConfigured ? "checkmark.circle.fill" : "exclamationmark.triangle.fill"
-                        )
-                        .foregroundColor(suggestionEngine.apiKeyConfigured ? .green : .orange)
-                        .font(.caption)
-
                         Spacer()
 
                         Button("Test Connection") {
                             testConnection()
                         }
-                        .disabled(!suggestionEngine.apiKeyConfigured || isTestingConnection)
+                        .disabled(!aiService.isAuthenticated || isTestingConnection)
                         .buttonStyle(.bordered)
                     }
                 }
@@ -96,7 +133,7 @@ struct AISettingsView: View {
                         Button(suggestionEngine.isEnabled ? "Stop Engine" : "Start Engine") {
                             toggleEngine()
                         }
-                        .disabled(!suggestionEngine.apiKeyConfigured)
+                        .disabled(!aiService.isAuthenticated)
                         .buttonStyle(.borderedProminent)
                     }
 
@@ -218,7 +255,7 @@ struct AISettingsView: View {
                 Button("Generate Now") {
                     suggestionEngine.generateSuggestionsManually()
                 }
-                .disabled(!suggestionEngine.isEnabled)
+                .disabled(!suggestionEngine.isEnabled || !aiService.isAuthenticated)
                 .buttonStyle(.bordered)
 
                 Button("Clear Suggestions") {
@@ -233,7 +270,7 @@ struct AISettingsView: View {
                         }
                     }
                 }
-                .disabled(!suggestionEngine.isEnabled)
+                .disabled(!suggestionEngine.isEnabled || !aiService.isAuthenticated)
                 .buttonStyle(.bordered)
             }
 
@@ -241,35 +278,21 @@ struct AISettingsView: View {
         }
         .padding()
         .frame(minWidth: 500, minHeight: 700)
-        .alert("API Key Saved", isPresented: $showingAPIKeyAlert) {
-            Button("OK") { }
-        } message: {
-            Text("Your OpenAI API key has been saved securely.")
-        }
         .alert("Connection Test", isPresented: $showingTestResults) {
             Button("OK") { }
         } message: {
             Text(testResultMessage)
         }
         .onAppear {
-            loadSavedAPIKey()
+            serverURL = aiService.getServerURL()
         }
     }
 
     // MARK: - Private Methods
 
-    private func saveAPIKey() {
-        // Update the AI service with the new API key
-        aiService.updateAPIKey(apiKey)
-        suggestionEngine.updateAPIKey(apiKey)
-        showingAPIKeyAlert = true
-        print("💾 API key saved and services updated")
-    }
-
-    private func loadSavedAPIKey() {
-        // In a real implementation, you'd load this from Keychain
-        // For demo purposes, we'll leave it empty
-        apiKey = ""
+    private func updateServerURL() {
+        aiService.setServerURL(serverURL)
+        print("💾 Server URL updated to: \(serverURL)")
     }
 
     private func toggleEngine() {
@@ -315,7 +338,7 @@ struct AISettingsView: View {
 
 #Preview {
     // Create mock objects for preview
-    let mockService = OpenAIService(apiKey: "test")
+    let mockService = ServerAIService()
     let mockIntegration = TextFieldIntegration(
         keyboardMonitor: KeyboardMonitor(),
         textFieldReader: TextFieldReader()
@@ -326,4 +349,5 @@ struct AISettingsView: View {
     )
 
     return AISettingsView(suggestionEngine: mockEngine, aiService: mockService)
+        .environmentObject(AuthenticationCoordinator())
 }

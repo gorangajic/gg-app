@@ -57,6 +57,18 @@ class AISuggestionEngine: ObservableObject {
 
         setupObservers()
         checkAPIKeyConfiguration()
+        setupAuthenticationObserver()
+    }
+
+    private func setupAuthenticationObserver() {
+        // Listen for authentication changes to update apiKeyConfigured status
+        NotificationCenter.default.addObserver(
+            forName: .authenticationStateChanged,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.checkAPIKeyConfiguration()
+        }
     }
 
     // MARK: - Public Methods
@@ -266,10 +278,10 @@ class AISuggestionEngine: ObservableObject {
         }
     }
 
-    private func buildAIContext(for text: String) -> AIContext {
+    private func buildAIContext(for text: String) -> LocalAIContext {
         let analysisContext = textFieldIntegration.getAnalysisContext()
 
-        return AIContext(
+        return LocalAIContext(
             appName: analysisContext.appName,
             fieldType: analysisContext.textFieldInfo?["role"] as? String,
             textLength: text.count
@@ -277,9 +289,15 @@ class AISuggestionEngine: ObservableObject {
     }
 
     private func checkAPIKeyConfiguration() {
-        // In a real implementation, you'd check if a valid API key is stored
-        // For now, we'll assume it needs to be configured
-        apiKeyConfigured = false
+        // Check if the AI service is authenticated (for ServerAIService)
+        // or if API key is configured (for OpenAIService)
+        if let serverService = aiService as? ServerAIService {
+            apiKeyConfigured = serverService.isAuthenticated
+        } else if let openAIService = aiService as? OpenAIService {
+            apiKeyConfigured = openAIService.isAPIKeyConfigured
+        } else {
+            apiKeyConfigured = false
+        }
     }
 
     private func updateAverageProcessingTime(_ newTime: TimeInterval) {

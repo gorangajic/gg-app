@@ -28,6 +28,31 @@ class ServerAIService: AIServiceProtocol, ObservableObject {
     init() {
         self.isAuthenticated = apiClient.isAuthenticated()
         loadCurrentUser()
+        setupAuthenticationObserver()
+    }
+
+    // MARK: - Authentication State Sync
+
+    private func setupAuthenticationObserver() {
+        // Listen for authentication changes from the coordinator
+        NotificationCenter.default.addObserver(
+            forName: .authenticationStateChanged,
+            object: nil,
+            queue: .main
+        ) { [weak self] notification in
+            self?.refreshAuthenticationState()
+        }
+    }
+
+    func refreshAuthenticationState() {
+        DispatchQueue.main.async {
+            self.isAuthenticated = self.apiClient.isAuthenticated()
+            if self.isAuthenticated {
+                self.loadCurrentUser()
+            } else {
+                self.currentUser = nil
+            }
+        }
     }
 
     // MARK: - Authentication Methods
@@ -88,7 +113,7 @@ class ServerAIService: AIServiceProtocol, ObservableObject {
 
     // MARK: - AIServiceProtocol Implementation
 
-    func generateSuggestions(for text: String, context: AIContext) async throws -> AISuggestionResponse {
+    func generateSuggestions(for text: String, context: LocalAIContext) async throws -> AISuggestionResponse {
         guard isAuthenticated else {
             throw AIServiceError.notAuthenticated
         }
@@ -97,7 +122,7 @@ class ServerAIService: AIServiceProtocol, ObservableObject {
         let startTime = Date()
 
         do {
-            // Convert AIContext to server's AIContext format
+            // Convert LocalAIContext to server's AIContext format
             let serverContext = ServerAPIClient.AIContext(
                 appName: context.appName,
                 fieldType: context.fieldType,
