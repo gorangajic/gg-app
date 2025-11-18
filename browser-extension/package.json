@@ -5,7 +5,10 @@
   "description": "TypeWise AI - AI-powered writing assistant Chrome extension with grammar, style, and clarity suggestions",
   "scripts": {
     "build": "echo 'Extension ready for loading'",
-    "dev": "echo 'Load extension from browser-extension directory in Chrome'"
+    "dev": "echo 'Load extension from browser-extension directory in Chrome'",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage"
   },
   "keywords": [
     "browser-extension",
@@ -16,5 +19,29 @@
     "productivity"
   ],
   "author": "TypeWise AI",
-  "license": "MIT"
+  "license": "MIT",
+  "devDependencies": {
+    "@types/chrome": "^0.0.270",
+    "@types/jest": "^29.5.12",
+    "jest": "^29.7.0",
+    "jest-environment-jsdom": "^29.7.0"
+  },
+  "jest": {
+    "testEnvironment": "jsdom",
+    "testMatch": [
+      "**/__tests__/**/*.test.js"
+    ],
+    "collectCoverageFrom": [
+      "background.js",
+      "content.js"
+    ],
+    "coveragePathIgnorePatterns": [
+      "/node_modules/",
+      "popup.js",
+      "options.js"
+    ],
+    "setupFilesAfterEnv": [
+      "./__tests__/setup.js"
+    ]
+  }
 }

@@ -183,10 +183,36 @@
 /* Footer */
 .typewise-overlay-footer {
   all: initial;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
   padding: 10px 15px;
   background: #f7fafc;
   border-top: 1px solid #e2e8f0;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+}
+
+.typewise-undo-button {
+  all: initial;
+  padding: 6px 12px;
+  background: #667eea;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+  display: inline-block;
+}
+
+.typewise-undo-button:hover {
+  background: #5568d3;
+}
+
+.typewise-undo-button.hidden {
+  display: none !important;
 }
 
 .typewise-hint {

@@ -373,18 +373,12 @@ async function updateSettings(data, sendResponse) {
 
 // Helper Functions
 
-function getAuthToken() {
-  return new Promise((resolve) => {
-    chrome.storage.sync.get([STORAGE_KEYS.AUTH_TOKEN], (result) => {
-      resolve(result[STORAGE_KEYS.AUTH_TOKEN] || null);
-    });
-  });
+async function getAuthToken() {
+  const result = await chrome.storage.sync.get([STORAGE_KEYS.AUTH_TOKEN]);
+  return result[STORAGE_KEYS.AUTH_TOKEN] || null;
 }
 
-function getStoredSettings() {
-  return new Promise((resolve) => {
-    chrome.storage.sync.get([STORAGE_KEYS.SETTINGS], (result) => {
-      resolve(result[STORAGE_KEYS.SETTINGS] || DEFAULT_SETTINGS);
-    });
-  });
+async function getStoredSettings() {
+  const result = await chrome.storage.sync.get([STORAGE_KEYS.SETTINGS]);
+  return result[STORAGE_KEYS.SETTINGS] || DEFAULT_SETTINGS;
 }
