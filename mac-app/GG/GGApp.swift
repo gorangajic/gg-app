@@ -326,16 +326,14 @@ class AppDelegate: NSObject, ObservableObject, KeyboardMonitorDelegate, TextFiel
         hideSuggestionOverlay()
 
         // Show user-friendly error based on type
-        if case .notAuthenticated = error {
+        switch error {
+        case .apiError(401, _):
+            // Authentication errors (401 Unauthorized)
             ErrorAlertHelper.showAuthenticationRequired {
                 NotificationCenter.default.post(name: .authenticationStateChanged, object: nil)
             }
-        } else if case .apiError(401, _) = error {
-            ErrorAlertHelper.showAuthenticationRequired {
-                NotificationCenter.default.post(name: .authenticationStateChanged, object: nil)
-            }
-        } else {
-            // Show error with retry option
+        default:
+            // All other errors - show retry option
             ErrorAlertHelper.showErrorWithRetry(
                 error,
                 title: "AI Suggestion Failed"
