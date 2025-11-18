@@ -134,25 +134,18 @@ class KeyboardMonitor: ObservableObject {
         }
 
         let keyCode = event.getIntegerValueField(.keyboardEventKeycode)
-        print("🔧 Debug: Key pressed - keyCode: \(keyCode)")
 
         // Handle special keys
         switch keyCode {
         case 51: // Delete key
-            print("🔧 Debug: Delete key pressed")
             handleDeleteKey()
         case 36, 76: // Return/Enter keys
-            print("🔧 Debug: Return/Enter key pressed")
             handleReturnKey()
         case 49: // Space key
-            print("🔧 Debug: Space key pressed")
             handleSpaceKey()
         default:
             if let character = getCharacterFromKeyCode(keyCode, event: event) {
-                print("🔧 Debug: Character '\(character)' captured")
                 handleCharacterInput(character)
-            } else {
-                print("🔧 Debug: Could not convert keyCode \(keyCode) to character")
             }
         }
 
@@ -183,7 +176,6 @@ class KeyboardMonitor: ObservableObject {
         let source = TISCopyCurrentKeyboardInputSource().takeRetainedValue()
         let layoutData = TISGetInputSourceProperty(source, kTISPropertyUnicodeKeyLayoutData)
         guard let keyLayoutPtr = layoutData else {
-            print("🔧 Debug: Failed to get keyboard layout data")
             return nil
         }
 
@@ -222,7 +214,6 @@ class KeyboardMonitor: ObservableObject {
         )
 
         guard status == noErr, actualStringLength > 0 else {
-            print("🔧 Debug: UCKeyTranslate failed with status: \(status), length: \(actualStringLength)")
             return nil
         }
 
@@ -241,13 +232,7 @@ class KeyboardMonitor: ObservableObject {
             50: "`"
         ]
 
-        if let character = keyMapping[keyCode] {
-            print("🔧 Debug: Used fallback mapping for keyCode \(keyCode) -> '\(character)'")
-            return character
-        }
-
-        print("🔧 Debug: No mapping found for keyCode \(keyCode)")
-        return nil
+        return keyMapping[keyCode]
     }
 
     private func getCharacterWithModifiers(_ keyCode: Int64, event: CGEvent) -> Character? {
@@ -262,15 +247,12 @@ class KeyboardMonitor: ObservableObject {
             ]
 
             if let character = shiftedMapping[keyCode] {
-                print("🔧 Debug: Used shifted mapping for keyCode \(keyCode) -> '\(character)'")
                 return character
             }
 
             // For letters, convert to uppercase
             if let baseChar = getCharacterFromFallbackMapping(keyCode), baseChar.isLetter {
-                let upperChar = Character(baseChar.uppercased())
-                print("🔧 Debug: Shifted letter for keyCode \(keyCode) -> '\(upperChar)'")
-                return upperChar
+                return Character(baseChar.uppercased())
             }
         }
 
@@ -280,7 +262,6 @@ class KeyboardMonitor: ObservableObject {
 
     private func handleCharacterInput(_ character: Character) {
         textBuffer.append(character)
-        print("🔧 Debug: Added '\(character)' to buffer. Buffer now: '\(textBuffer)'")
         updateCurrentText()
 
         // Check for immediate triggers (sentence endings)
@@ -292,29 +273,24 @@ class KeyboardMonitor: ObservableObject {
     private func handleDeleteKey() {
         if !textBuffer.isEmpty {
             textBuffer.removeLast()
-            print("🔧 Debug: Deleted character. Buffer now: '\(textBuffer)'")
             updateCurrentText()
         }
     }
 
     private func handleReturnKey() {
         textBuffer.append("\n")
-        print("🔧 Debug: Added newline to buffer. Buffer now: '\(textBuffer)'")
         updateCurrentText()
         triggerSuggestionAfterDelay(immediate: false)
     }
 
     private func handleSpaceKey() {
         textBuffer.append(" ")
-        print("🔧 Debug: Added space to buffer. Buffer now: '\(textBuffer)'")
         updateCurrentText()
     }
 
     private func updateCurrentText() {
-        print("🔧 Debug: Updating UI with text: '\(textBuffer)'")
         DispatchQueue.main.async {
             self.currentText = self.textBuffer
-            print("🔧 Debug: UI updated on main thread")
         }
     }
 
@@ -362,7 +338,6 @@ class KeyboardMonitor: ObservableObject {
         guard shouldTriggerSuggestion() else { return }
 
         let contextText = getRecentContext()
-        print("🔍 Triggering suggestion for: '\(contextText)'")
 
         // Notify delegate
         DispatchQueue.main.async {

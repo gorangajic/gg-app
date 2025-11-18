@@ -17,6 +17,7 @@ struct ContentView: View {
     @State private var lastTextFieldChange: String = "No text field activity"
     @State private var lastAIActivity: String = "No AI activity"
     @State private var showAuthSheet: Bool = false
+    @State private var showOnboarding: Bool = !UserDefaults.standard.bool(forKey: "OnboardingCompleted")
 
     var body: some View {
         VStack(spacing: 20) {
@@ -267,6 +268,10 @@ struct ContentView: View {
             AuthenticationView()
                 .environmentObject(authCoordinator)
                 .frame(minWidth: 400, minHeight: 300)
+        }
+        .sheet(isPresented: $showOnboarding) {
+            OnboardingView(aiService: aiService)
+                .environmentObject(authCoordinator)
         }
         .onReceive(NotificationCenter.default.publisher(for: .suggestionTriggered)) { notification in
             if let text = notification.userInfo?["text"] as? String {
