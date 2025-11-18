@@ -50,6 +50,7 @@ struct GGApp: App {
     @StateObject private var textFieldIntegration: TextFieldIntegration
     @StateObject private var aiService: OpenAIService
     @StateObject private var aiSuggestionEngine: AISuggestionEngine
+    @StateObject private var authCoordinator = AuthenticationCoordinator()
     @State private var isMonitoring = false
 
     init() {
@@ -74,15 +75,20 @@ struct GGApp: App {
                 aiSuggestionEngine: aiSuggestionEngine,
                 aiService: aiService
             )
+                .environmentObject(authCoordinator)
                 .onAppear {
                     setupMonitoring()
                 }
                 .onDisappear {
                     stopMonitoring()
                 }
+                .onOpenURL { url in
+                    handleIncomingURL(url)
+                }
         }
         .windowStyle(.hiddenTitleBar)
         .windowResizability(.contentSize)
+        .handlesExternalEvents(matching: ["*"])
 
         // AI Settings window - can be opened directly
         WindowGroup("AI Settings") {
@@ -121,6 +127,17 @@ struct GGApp: App {
         keyboardMonitor.stopMonitoring()
         textFieldReader.stopMonitoring()
         aiSuggestionEngine.stopEngine()
+    }
+
+    // MARK: - URL Handling
+
+    private func handleIncomingURL(_ url: URL) {
+        print("🔗 Received URL: \(url)")
+
+        // Check if this is an auth callback
+        if url.scheme == "ggapp" && url.host == "auth" {
+            authCoordinator.handleAuthCallback(url: url)
+        }
     }
 }
 

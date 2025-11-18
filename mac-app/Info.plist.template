@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!-- Add this to your existing Info.plist -->
+
+    <!-- Custom URL Scheme for Browser Authentication -->
+    <key>CFBundleURLTypes</key>
+    <array>
+        <dict>
+            <key>CFBundleURLName</key>
+            <string>com.typewise.ai.auth</string>
+            <key>CFBundleURLSchemes</key>
+            <array>
+                <string>ggapp</string>
+            </array>
+            <key>CFBundleTypeRole</key>
+            <string>Editor</string>
+        </dict>
+    </array>
+
+    <!--
+    INSTRUCTIONS:
+
+    1. If you already have an Info.plist in your Xcode project:
+       - Open it in Xcode
+       - Add the CFBundleURLTypes section above
+
+    2. If you don't have an Info.plist:
+       - Create one in Xcode: File > New > File > Property List
+       - Name it Info.plist
+       - Add it to your target
+       - Copy the CFBundleURLTypes section above
+
+    3. Alternative: Configure in Xcode UI:
+       - Select your project in the navigator
+       - Select the GG target
+       - Go to the Info tab
+       - Under "URL Types", click + to add a new type
+       - Set:
+         * Identifier: com.typewise.ai.auth
+         * URL Schemes: ggapp
+         * Role: Editor
+
+    This configuration allows macOS to open your app when a URL
+    starting with "ggapp://" is opened (e.g., from a web browser).
+    -->
+</dict>
+</plist>
