@@ -28,6 +28,31 @@ class ServerAIService: AIServiceProtocol, ObservableObject {
     init() {
         self.isAuthenticated = apiClient.isAuthenticated()
         loadCurrentUser()
+        setupAuthenticationObserver()
+    }
+
+    // MARK: - Authentication State Sync
+
+    private func setupAuthenticationObserver() {
+        // Listen for authentication changes from the coordinator
+        NotificationCenter.default.addObserver(
+            forName: .authenticationStateChanged,
+            object: nil,
+            queue: .main
+        ) { [weak self] notification in
+            self?.refreshAuthenticationState()
+        }
+    }
+
+    func refreshAuthenticationState() {
+        DispatchQueue.main.async {
+            self.isAuthenticated = self.apiClient.isAuthenticated()
+            if self.isAuthenticated {
+                self.loadCurrentUser()
+            } else {
+                self.currentUser = nil
+            }
+        }
     }
 
     // MARK: - Authentication Methods

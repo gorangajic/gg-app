@@ -66,6 +66,9 @@ class AuthenticationCoordinator: ObservableObject {
             self.authToken = token
             self.isAuthenticated = true
 
+            // Notify other components about auth state change
+            NotificationCenter.default.post(name: .authenticationStateChanged, object: nil)
+
             // Show notification
             self.showAuthSuccessNotification()
 
@@ -85,6 +88,9 @@ class AuthenticationCoordinator: ObservableObject {
                 self.isAuthenticated = false
                 self.currentUser = nil
                 self.authToken = nil
+
+                // Notify other components about auth state change
+                NotificationCenter.default.post(name: .authenticationStateChanged, object: nil)
             }
         } catch {
             print("Logout error: \(error)")
@@ -93,6 +99,9 @@ class AuthenticationCoordinator: ObservableObject {
                 self.isAuthenticated = false
                 self.currentUser = nil
                 self.authToken = nil
+
+                // Notify other components about auth state change
+                NotificationCenter.default.post(name: .authenticationStateChanged, object: nil)
             }
         }
     }

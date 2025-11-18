@@ -93,6 +93,7 @@ struct GGApp: App {
         // AI Settings window - can be opened directly
         WindowGroup("AI Settings") {
             AISettingsView(suggestionEngine: aiSuggestionEngine, aiService: aiService)
+                .environmentObject(authCoordinator)
         }
         .windowToolbarStyle(.unified)
 
@@ -468,4 +469,5 @@ extension Notification.Name {
     static let aiSuggestionsGenerated = Notification.Name("aiSuggestionsGenerated")
     static let aiSuggestionApplied = Notification.Name("aiSuggestionApplied")
     static let aiSuggestionError = Notification.Name("aiSuggestionError")
+    static let authenticationStateChanged = Notification.Name("authenticationStateChanged")
 }

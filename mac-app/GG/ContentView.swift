@@ -97,7 +97,7 @@ struct ContentView: View {
                         .foregroundColor(.blue)
                         .italic()
                 } else {
-                    Text("AI: API key required (⌘I to configure)")
+                    Text(authCoordinator.isAuthenticated ? "AI: Ready (⌘I to configure)" : "AI: Sign in required")
                         .font(.caption)
                         .foregroundColor(.orange)
                 }

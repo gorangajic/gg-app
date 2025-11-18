@@ -319,6 +319,7 @@ struct StatusBarMenuView: View {
                 ),
                 aiService: ServerAIService()
             )
+            .environmentObject(AuthenticationCoordinator())
 
             let hostingController = NSHostingController(rootView: settingsView)
             let window = NSWindow(contentViewController: hostingController)

@@ -57,6 +57,18 @@ class AISuggestionEngine: ObservableObject {
 
         setupObservers()
         checkAPIKeyConfiguration()
+        setupAuthenticationObserver()
+    }
+
+    private func setupAuthenticationObserver() {
+        // Listen for authentication changes to update apiKeyConfigured status
+        NotificationCenter.default.addObserver(
+            forName: .authenticationStateChanged,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.checkAPIKeyConfiguration()
+        }
     }
 
     // MARK: - Public Methods
