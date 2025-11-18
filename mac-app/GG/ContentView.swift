@@ -11,7 +11,7 @@ struct ContentView: View {
     @ObservedObject var keyboardMonitor: KeyboardMonitor
     @ObservedObject var textFieldReader: TextFieldReader
     @ObservedObject var aiSuggestionEngine: AISuggestionEngine
-    @ObservedObject var aiService: OpenAIService
+    @ObservedObject var aiService: ServerAIService
     @EnvironmentObject var authCoordinator: AuthenticationCoordinator
     @State private var lastSuggestionText: String = "No suggestions yet"
     @State private var lastTextFieldChange: String = "No text field activity"
@@ -378,7 +378,7 @@ struct ContentView: View {
     let keyboardMonitor = KeyboardMonitor()
     let textFieldReader = TextFieldReader()
     let textFieldIntegration = TextFieldIntegration(keyboardMonitor: keyboardMonitor, textFieldReader: textFieldReader)
-    let aiService = OpenAIService(apiKey: "test")
+    let aiService = ServerAIService()
     let aiSuggestionEngine = AISuggestionEngine(aiService: aiService, textFieldIntegration: textFieldIntegration)
     let authCoordinator = AuthenticationCoordinator()
 

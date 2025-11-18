@@ -277,9 +277,15 @@ class AISuggestionEngine: ObservableObject {
     }
 
     private func checkAPIKeyConfiguration() {
-        // In a real implementation, you'd check if a valid API key is stored
-        // For now, we'll assume it needs to be configured
-        apiKeyConfigured = false
+        // Check if the AI service is authenticated (for ServerAIService)
+        // or if API key is configured (for OpenAIService)
+        if let serverService = aiService as? ServerAIService {
+            apiKeyConfigured = serverService.isAuthenticated
+        } else if let openAIService = aiService as? OpenAIService {
+            apiKeyConfigured = openAIService.isAPIKeyConfigured
+        } else {
+            apiKeyConfigured = false
+        }
     }
 
     private func updateAverageProcessingTime(_ newTime: TimeInterval) {

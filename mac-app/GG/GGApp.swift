@@ -48,7 +48,7 @@ struct GGApp: App {
     @StateObject private var keyboardMonitor = KeyboardMonitor()
     @StateObject private var textFieldReader = TextFieldReader()
     @StateObject private var textFieldIntegration: TextFieldIntegration
-    @StateObject private var aiService: OpenAIService
+    @StateObject private var aiService: ServerAIService
     @StateObject private var aiSuggestionEngine: AISuggestionEngine
     @StateObject private var authCoordinator = AuthenticationCoordinator()
     @State private var isMonitoring = false
@@ -57,7 +57,7 @@ struct GGApp: App {
         let keyboardMonitor = KeyboardMonitor()
         let textFieldReader = TextFieldReader()
         let textFieldIntegration = TextFieldIntegration(keyboardMonitor: keyboardMonitor, textFieldReader: textFieldReader)
-        let aiService = OpenAIService(apiKey: "")
+        let aiService = ServerAIService()
         let aiSuggestionEngine = AISuggestionEngine(aiService: aiService, textFieldIntegration: textFieldIntegration)
 
         self._keyboardMonitor = StateObject(wrappedValue: keyboardMonitor)
