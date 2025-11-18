@@ -8,6 +8,10 @@ import {
   type SuggestionResponse,
   type Suggestion,
 } from '@/lib/ai-service';
+import { checkQuota, incrementQuota } from '@/lib/quota';
+import { logInfo, logError } from '@/lib/logger';
+import { logRequestHistory, getClientInfo } from '@/lib/request-history';
+import { apiRateLimiter } from '@/lib/rate-limiter';
 
 const generateSchema = z.object({
   text: z.string().min(1, 'Text is required'),
@@ -24,21 +28,61 @@ const generateSchema = z.object({
 
 export async function POST(request: NextRequest) {
   const startTime = Date.now();
+  let userId: string | undefined;
+  let statusCode = 200;
 
   try {
+    // Apply rate limiting
+    const rateLimitResult = await apiRateLimiter(request);
+    if ('status' in rateLimitResult) {
+      return rateLimitResult;
+    }
+
     // Authenticate the user
     const authResult = await authenticate(request);
-    if (authResult instanceof NextResponse) {
+    if ('status' in authResult) {
       return authResult;
     }
 
     const { user } = authResult;
+    userId = user.id;
+
+    // Check quota
+    const quotaCheck = await checkQuota(userId);
+    if (!quotaCheck.allowed) {
+      statusCode = 429;
+      logInfo('Quota exceeded', { userId, remaining: quotaCheck.remaining });
+
+      const response = NextResponse.json(
+        {
+          error: 'Daily quota exceeded',
+          quota: {
+            limit: quotaCheck.quota,
+            remaining: quotaCheck.remaining,
+            resetAt: quotaCheck.resetAt,
+          },
+        },
+        { status: 429, headers: rateLimitResult.headers }
+      );
+
+      await logRequestHistory({
+        userId,
+        endpoint: '/api/suggestions/generate',
+        method: 'POST',
+        statusCode: 429,
+        processingTime: Date.now() - startTime,
+        ...getClientInfo(request),
+      });
+
+      return response;
+    }
 
     // Parse and validate request body
     const body = await request.json();
     const validation = generateSchema.safeParse(body);
 
     if (!validation.success) {
+      statusCode = 400;
       return NextResponse.json(
         { error: 'Validation error', details: validation.error.errors },
         { status: 400 }
@@ -46,6 +90,12 @@ export async function POST(request: NextRequest) {
     }
 
     const { text, context, maxSuggestions } = validation.data;
+
+    logInfo('Generating AI suggestions', {
+      userId,
+      textLength: text.length,
+      maxSuggestions,
+    });
 
     // Build context-aware prompt
     let contextInfo = '';
@@ -105,19 +155,53 @@ If no improvements are needed, return an empty array: []`;
 
     const processingTime = Date.now() - startTime;
 
-    // Log usage
-    console.log(
-      `Suggestions generated for user ${user.id}: ${suggestions.length} suggestions in ${processingTime}ms`
-    );
+    // Increment quota
+    await incrementQuota(userId!);
+
+    logInfo('AI suggestions generated', {
+      userId,
+      suggestionsCount: suggestions.length,
+      processingTime,
+    });
 
     const response: SuggestionResponse = {
       suggestions,
       processingTime,
     };
 
-    return NextResponse.json(response);
+    // Log request history
+    await logRequestHistory({
+      userId: userId!,
+      endpoint: '/api/suggestions/generate',
+      method: 'POST',
+      statusCode: 200,
+      processingTime,
+      requestData: { textLength: text.length, maxSuggestions },
+      responseData: { suggestionsCount: suggestions.length },
+      ...getClientInfo(request),
+    });
+
+    return NextResponse.json(response, { headers: rateLimitResult.headers });
   } catch (error: any) {
-    console.error('Generate suggestions error:', error);
+    statusCode = error.code === 'insufficient_quota' ? 429 : 500;
+
+    logError({
+      error,
+      userId,
+      endpoint: '/api/suggestions/generate',
+      message: 'Generate suggestions error',
+    });
+
+    if (userId) {
+      await logRequestHistory({
+        userId,
+        endpoint: '/api/suggestions/generate',
+        method: 'POST',
+        statusCode,
+        processingTime: Date.now() - startTime,
+        ...getClientInfo(request),
+      });
+    }
 
     if (error.code === 'insufficient_quota') {
       return NextResponse.json(
