@@ -156,7 +156,7 @@ class ServerAPIClient {
     }
 
     func logout() async throws {
-        _ = try await post(endpoint: "/api/auth/logout", body: EmptyBody(), authenticated: true)
+        let _: EmptyBody = try await post(endpoint: "/api/auth/logout", body: EmptyBody(), authenticated: true)
         clearAuthToken()
     }
 
