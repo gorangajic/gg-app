@@ -56,7 +56,9 @@ class AISuggestionEngine: ObservableObject {
         self.textFieldIntegration = textFieldIntegration
 
         setupObservers()
-        checkAPIKeyConfiguration()
+        Task { @MainActor in
+            checkAPIKeyConfiguration()
+        }
         setupAuthenticationObserver()
     }
 
@@ -67,7 +69,9 @@ class AISuggestionEngine: ObservableObject {
             object: nil,
             queue: .main
         ) { [weak self] _ in
-            self?.checkAPIKeyConfiguration()
+            Task { @MainActor in
+                self?.checkAPIKeyConfiguration()
+            }
         }
     }
 
@@ -288,6 +292,7 @@ class AISuggestionEngine: ObservableObject {
         )
     }
 
+    @MainActor
     private func checkAPIKeyConfiguration() {
         // Check if the AI service is authenticated (for ServerAIService)
         // or if API key is configured (for OpenAIService)
