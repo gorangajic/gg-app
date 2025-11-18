@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TypeWise AI Settings</title>
+  <link rel="stylesheet" href="options.css">
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>TypeWise AI Settings</h1>
+      <p class="subtitle">Configure your AI writing assistant</p>
+    </header>
+
+    <main>
+      <!-- Server Configuration -->
+      <section class="section">
+        <h2>Server Configuration</h2>
+        <div class="form-group">
+          <label for="serverUrl">Server URL</label>
+          <input type="text" id="serverUrl" placeholder="http://localhost:3001">
+          <p class="help-text">The URL of your TypeWise AI server</p>
+        </div>
+      </section>
+
+      <!-- Suggestion Settings -->
+      <section class="section">
+        <h2>Suggestion Settings</h2>
+
+        <div class="form-group">
+          <div class="checkbox-group">
+            <input type="checkbox" id="autoTrigger">
+            <label for="autoTrigger">Auto-trigger suggestions</label>
+          </div>
+          <p class="help-text">Automatically show suggestions while typing</p>
+        </div>
+
+        <div class="form-group">
+          <label for="minTextLength">Minimum text length</label>
+          <input type="number" id="minTextLength" min="1" max="1000">
+          <p class="help-text">Minimum characters before triggering suggestions</p>
+        </div>
+
+        <div class="form-group">
+          <label for="suggestionDelay">Suggestion delay (ms)</label>
+          <input type="number" id="suggestionDelay" min="100" max="10000" step="100">
+          <p class="help-text">Delay after typing stops before showing suggestions</p>
+        </div>
+
+        <div class="form-group">
+          <label for="maxSuggestions">Maximum suggestions</label>
+          <input type="number" id="maxSuggestions" min="1" max="10">
+          <p class="help-text">Maximum number of suggestions to display</p>
+        </div>
+      </section>
+
+      <!-- Keyboard Shortcuts -->
+      <section class="section">
+        <h2>Keyboard Shortcuts</h2>
+        <div class="shortcut-list">
+          <div class="shortcut-item">
+            <span class="shortcut-key">Ctrl/Cmd + Shift + Space</span>
+            <span class="shortcut-desc">Manually trigger suggestions</span>
+          </div>
+          <div class="shortcut-item">
+            <span class="shortcut-key">↑ / ↓</span>
+            <span class="shortcut-desc">Navigate suggestions</span>
+          </div>
+          <div class="shortcut-item">
+            <span class="shortcut-key">Enter</span>
+            <span class="shortcut-desc">Apply selected suggestion</span>
+          </div>
+          <div class="shortcut-item">
+            <span class="shortcut-key">Esc</span>
+            <span class="shortcut-desc">Close suggestions</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- Account -->
+      <section class="section">
+        <h2>Account</h2>
+        <div id="accountInfo" class="account-info">
+          <p>Loading account information...</p>
+        </div>
+      </section>
+
+      <!-- Actions -->
+      <div class="actions">
+        <button id="saveBtn" class="btn btn-primary">Save Settings</button>
+        <button id="resetBtn" class="btn btn-secondary">Reset to Defaults</button>
+      </div>
+
+      <div id="saveMessage" class="save-message"></div>
+    </main>
+
+    <footer>
+      <p>TypeWise AI Chrome Extension v1.0.0</p>
+    </footer>
+  </div>
+
+  <script src="options.js"></script>
+</body>
+</html>

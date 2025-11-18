@@ -2,14 +2,19 @@
   "name": "@gg-app/browser-extension",
   "version": "1.0.0",
   "private": true,
-  "description": "GG Browser Extension",
-  "main": "src/index.js",
+  "description": "TypeWise AI - AI-powered writing assistant Chrome extension with grammar, style, and clarity suggestions",
   "scripts": {
-    "build": "echo 'Build script not yet configured'",
-    "dev": "echo 'Dev script not yet configured'"
+    "build": "echo 'Extension ready for loading'",
+    "dev": "echo 'Load extension from browser-extension directory in Chrome'"
   },
   "keywords": [
     "browser-extension",
-    "chrome-extension"
-  ]
+    "chrome-extension",
+    "ai",
+    "writing-assistant",
+    "grammar",
+    "productivity"
+  ],
+  "author": "TypeWise AI",
+  "license": "MIT"
 }
