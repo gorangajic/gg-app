@@ -101,6 +101,10 @@ struct ErrorResponse: Codable {
     }
 }
 
+struct MessageResponse: Codable {
+    let message: String
+}
+
 // MARK: - Server API Client
 
 class ServerAPIClient {
@@ -156,7 +160,7 @@ class ServerAPIClient {
     }
 
     func logout() async throws {
-        _ = try await post(endpoint: "/api/auth/logout", body: EmptyBody(), authenticated: true)
+        let _: MessageResponse = try await post(endpoint: "/api/auth/logout", body: EmptyBody(), authenticated: true)
         clearAuthToken()
     }
 
