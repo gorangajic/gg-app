@@ -50,7 +50,6 @@ struct OnboardingView: View {
                 )
                 .tag(3)
             }
-            .tabViewStyle(.page(indexDisplayMode: .never))
 
             // Navigation buttons
             HStack {
