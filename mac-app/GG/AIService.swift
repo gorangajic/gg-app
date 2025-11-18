@@ -10,19 +10,19 @@ import Foundation
 import Combine
 import Security
 
-// MARK: - Keychain Helper for Secure API Key Storage
+// MARK: - Keychain Helper for Secure Storage
 
 class KeychainHelper {
     private static let service = "com.typewise.ai"
-    private static let account = "openai-api-key"
 
-    static func save(apiKey: String) -> Bool {
-        let data = apiKey.data(using: .utf8)!
+    // Generic save method
+    static func save(key: String, value: String) -> Bool {
+        let data = value.data(using: .utf8)!
 
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
-            kSecAttrAccount as String: account,
+            kSecAttrAccount as String: key,
             kSecValueData as String: data
         ]
 
@@ -33,11 +33,12 @@ class KeychainHelper {
         return status == errSecSuccess
     }
 
-    static func load() -> String? {
+    // Generic load method
+    static func load(key: String) -> String? {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
-            kSecAttrAccount as String: account,
+            kSecAttrAccount as String: key,
             kSecReturnData as String: true,
             kSecMatchLimit as String: kSecMatchLimitOne
         ]
@@ -47,22 +48,36 @@ class KeychainHelper {
 
         if status == errSecSuccess,
            let data = dataTypeRef as? Data,
-           let apiKey = String(data: data, encoding: .utf8) {
-            return apiKey
+           let value = String(data: data, encoding: .utf8) {
+            return value
         }
 
         return nil
     }
 
-    static func delete() -> Bool {
+    // Generic delete method
+    static func delete(key: String) -> Bool {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
-            kSecAttrAccount as String: account
+            kSecAttrAccount as String: key
         ]
 
         let status = SecItemDelete(query as CFDictionary)
         return status == errSecSuccess
+    }
+
+    // Legacy methods for backward compatibility
+    static func save(apiKey: String) -> Bool {
+        return save(key: "openai-api-key", value: apiKey)
+    }
+
+    static func load() -> String? {
+        return load(key: "openai-api-key")
+    }
+
+    static func delete() -> Bool {
+        return delete(key: "openai-api-key")
     }
 }
 
