@@ -213,7 +213,18 @@ class ServerAPIClient {
 
         request.httpBody = try JSONEncoder().encode(body)
 
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let (data, response): (Data, URLResponse)
+        do {
+            (data, response) = try await URLSession.shared.data(for: request)
+        } catch let error as URLError {
+            // Network-specific errors
+            if error.code == .cannotConnectToHost || error.code == .networkConnectionLost {
+                throw ServerAPIError.serverUnavailable
+            }
+            throw ServerAPIError.networkError(error)
+        } catch {
+            throw ServerAPIError.networkError(error)
+        }
 
         guard let httpResponse = response as? HTTPURLResponse else {
             throw ServerAPIError.invalidResponse
@@ -243,19 +254,82 @@ enum ServerAPIError: LocalizedError {
     case invalidResponse
     case httpError(statusCode: Int)
     case apiError(statusCode: Int, message: String)
+    case networkError(Error)
+    case serverUnavailable
 
     var errorDescription: String? {
         switch self {
         case .invalidURL:
-            return "Invalid server URL"
+            return "Server URL is not configured correctly. Please check your settings."
         case .notAuthenticated:
-            return "Not authenticated. Please log in."
+            return "You need to sign in to use AI features. Please authenticate in the app."
         case .invalidResponse:
-            return "Invalid response from server"
+            return "Received an unexpected response from the server. Please try again."
         case .httpError(let statusCode):
-            return "Server error (HTTP \(statusCode))"
+            return httpErrorMessage(for: statusCode)
         case .apiError(let statusCode, let message):
-            return "API error (HTTP \(statusCode)): \(message)"
+            return "Server returned an error (\(statusCode)): \(message)"
+        case .networkError(let error):
+            return "Network connection failed: \(error.localizedDescription)"
+        case .serverUnavailable:
+            return "Unable to connect to the server. Please check if the server is running."
+        }
+    }
+
+    var recoverySuggestion: String? {
+        switch self {
+        case .invalidURL:
+            return "Go to Settings and verify the server URL is correct (e.g., http://localhost:3001)"
+        case .notAuthenticated:
+            return "Click the 'Sign In' button to authenticate with your account."
+        case .invalidResponse:
+            return "This might be a temporary issue. Try again in a moment."
+        case .httpError(let statusCode):
+            return httpRecoverySuggestion(for: statusCode)
+        case .apiError(let statusCode, _):
+            return httpRecoverySuggestion(for: statusCode)
+        case .networkError:
+            return "Check your internet connection and ensure the server is running."
+        case .serverUnavailable:
+            return "Make sure the server is started with 'npm run dev' in the server directory."
+        }
+    }
+
+    private func httpErrorMessage(for statusCode: Int) -> String {
+        switch statusCode {
+        case 400:
+            return "The request was invalid. Please check your input."
+        case 401:
+            return "Authentication failed. Please sign in again."
+        case 403:
+            return "Access denied. You don't have permission for this action."
+        case 404:
+            return "The requested resource was not found."
+        case 429:
+            return "Too many requests. Please wait a moment before trying again."
+        case 500...599:
+            return "The server encountered an error. Please try again later."
+        default:
+            return "Server error (HTTP \(statusCode)). Please try again."
+        }
+    }
+
+    private func httpRecoverySuggestion(for statusCode: Int) -> String {
+        switch statusCode {
+        case 400:
+            return "Make sure you have entered text before requesting suggestions."
+        case 401:
+            return "Sign out and sign in again to refresh your authentication."
+        case 403:
+            return "Contact support if you believe this is an error."
+        case 404:
+            return "The server API might have changed. Try updating the app."
+        case 429:
+            return "Wait a few seconds and try again."
+        case 500...599:
+            return "This is a server issue. Please try again in a few minutes."
+        default:
+            return "Try again or contact support if the problem persists."
         }
     }
 }

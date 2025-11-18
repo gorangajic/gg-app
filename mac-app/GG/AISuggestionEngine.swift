@@ -100,7 +100,6 @@ class AISuggestionEngine: ObservableObject {
 
         let text = textFieldIntegration.getTextForAIAnalysis()
         guard !text.isEmpty && text.count >= minimumTextLength else {
-            print("⚠️ Text too short for suggestions: \(text.count) characters")
             return
         }
 
@@ -112,7 +111,6 @@ class AISuggestionEngine: ObservableObject {
     func generateSuggestionsManually(for text: String) async {
         guard isEnabled else { return }
         guard !text.isEmpty && text.count >= minimumTextLength else {
-            print("⚠️ Text too short for suggestions: \(text.count) characters")
             return
         }
 
@@ -294,12 +292,9 @@ class AISuggestionEngine: ObservableObject {
 
     @MainActor
     private func checkAPIKeyConfiguration() {
-        // Check if the AI service is authenticated (for ServerAIService)
-        // or if API key is configured (for OpenAIService)
+        // Check if the AI service is authenticated (ServerAIService only)
         if let serverService = aiService as? ServerAIService {
             apiKeyConfigured = serverService.isAuthenticated
-        } else if let openAIService = aiService as? OpenAIService {
-            apiKeyConfigured = openAIService.isAPIKeyConfigured
         } else {
             apiKeyConfigured = false
         }

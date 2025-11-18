@@ -7,42 +7,6 @@
 
 import SwiftUI
 
-// MARK: - Settings Manager
-
-class SettingsManager: ObservableObject {
-    @Published var apiKey: String {
-        didSet {
-            if !apiKey.isEmpty {
-                _ = KeychainHelper.save(apiKey: apiKey)
-            }
-        }
-    }
-
-    @Published var autoTriggerEnabled: Bool {
-        didSet { UserDefaults.standard.set(autoTriggerEnabled, forKey: "autoTriggerEnabled") }
-    }
-
-    @Published var minimumTextLength: Int {
-        didSet { UserDefaults.standard.set(minimumTextLength, forKey: "minimumTextLength") }
-    }
-
-    @Published var suggestionDelay: Double {
-        didSet { UserDefaults.standard.set(suggestionDelay, forKey: "suggestionDelay") }
-    }
-
-    @Published var maxSuggestions: Int {
-        didSet { UserDefaults.standard.set(maxSuggestions, forKey: "maxSuggestions") }
-    }
-
-    init() {
-        self.apiKey = KeychainHelper.load() ?? ""
-        self.autoTriggerEnabled = UserDefaults.standard.object(forKey: "autoTriggerEnabled") as? Bool ?? true
-        self.minimumTextLength = UserDefaults.standard.object(forKey: "minimumTextLength") as? Int ?? 15
-        self.suggestionDelay = UserDefaults.standard.object(forKey: "suggestionDelay") as? Double ?? 2.0
-        self.maxSuggestions = UserDefaults.standard.object(forKey: "maxSuggestions") as? Int ?? 5
-    }
-}
-
 @main
 struct GGApp: App {
     @StateObject private var keyboardMonitor = KeyboardMonitor()
@@ -287,8 +251,6 @@ class AppDelegate: NSObject, ObservableObject, KeyboardMonitorDelegate, TextFiel
     // MARK: - KeyboardMonitorDelegate
 
     func keyboardMonitor(_ monitor: KeyboardMonitor, didTriggerSuggestion text: String) {
-        print("📝 Keyboard activity detected: '\(text)' (manual mode - no auto-trigger)")
-
         // In manual mode, we only log keyboard activity but don't auto-trigger
         // Users must click the suggestion button to get AI help
 
@@ -303,8 +265,6 @@ class AppDelegate: NSObject, ObservableObject, KeyboardMonitorDelegate, TextFiel
     // MARK: - TextFieldReaderDelegate
 
     func textFieldReader(_ reader: TextFieldReader, didDetectTextChange text: String, in element: AXUIElement) {
-        print("📝 Text field content changed: '\(text)' in app: \(reader.focusedAppName)")
-
         // Show suggestion button near the focused text field (only if text has sufficient length)
         if text.count >= 10 { // Only show button if there's meaningful text
             if let elementInfo = reader.getFocusedElementInfo(),
@@ -333,8 +293,6 @@ class AppDelegate: NSObject, ObservableObject, KeyboardMonitorDelegate, TextFiel
     }
 
     func textFieldReader(_ reader: TextFieldReader, didLoseFocus previousText: String) {
-        print("📝 Text field lost focus. Previous text: '\(previousText)'")
-
         // Hide both suggestion button and overlay when text field loses focus
         hideSuggestionButton()
         hideSuggestionOverlay()
@@ -364,10 +322,30 @@ class AppDelegate: NSObject, ObservableObject, KeyboardMonitorDelegate, TextFiel
     }
 
     func suggestionEngine(_ engine: AISuggestionEngine, didFailWithError error: AIServiceError) {
-        print("❌ AI suggestion failed: \(error.localizedDescription)")
-
         // Hide overlay on error
         hideSuggestionOverlay()
+
+        // Show user-friendly error based on type
+        if case .notAuthenticated = error {
+            ErrorAlertHelper.showAuthenticationRequired {
+                NotificationCenter.default.post(name: .authenticationStateChanged, object: nil)
+            }
+        } else if case .apiError(401, _) = error {
+            ErrorAlertHelper.showAuthenticationRequired {
+                NotificationCenter.default.post(name: .authenticationStateChanged, object: nil)
+            }
+        } else {
+            // Show error with retry option
+            ErrorAlertHelper.showErrorWithRetry(
+                error,
+                title: "AI Suggestion Failed"
+            ) { [weak self] in
+                // Retry the suggestion
+                Task {
+                    await self?.aiSuggestionEngine?.generateSuggestionsManually()
+                }
+            }
+        }
 
         // Post notification for error handling
         NotificationCenter.default.post(
