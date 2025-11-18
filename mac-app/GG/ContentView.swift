@@ -12,12 +12,19 @@ struct ContentView: View {
     @ObservedObject var textFieldReader: TextFieldReader
     @ObservedObject var aiSuggestionEngine: AISuggestionEngine
     @ObservedObject var aiService: OpenAIService
+    @EnvironmentObject var authCoordinator: AuthenticationCoordinator
     @State private var lastSuggestionText: String = "No suggestions yet"
     @State private var lastTextFieldChange: String = "No text field activity"
     @State private var lastAIActivity: String = "No AI activity"
+    @State private var showAuthSheet: Bool = false
 
     var body: some View {
         VStack(spacing: 20) {
+            // Authentication Status Banner
+            authenticationBanner
+
+            Divider()
+
             // Header
             VStack {
                 Image(systemName: "brain.head.profile")
@@ -256,6 +263,11 @@ struct ContentView: View {
         }
         .padding()
         .frame(minWidth: 800, minHeight: 700)
+        .sheet(isPresented: $showAuthSheet) {
+            AuthenticationView()
+                .environmentObject(authCoordinator)
+                .frame(minWidth: 400, minHeight: 300)
+        }
         .onReceive(NotificationCenter.default.publisher(for: .suggestionTriggered)) { notification in
             if let text = notification.userInfo?["text"] as? String {
                 lastSuggestionText = text
@@ -305,6 +317,61 @@ struct ContentView: View {
             settingsWindow.makeKeyAndOrderFront(nil)
         }
     }
+
+    // MARK: - Authentication Banner
+
+    private var authenticationBanner: some View {
+        Button(action: {
+            showAuthSheet = true
+        }) {
+            HStack {
+                Image(systemName: authCoordinator.isAuthenticated ? "checkmark.circle.fill" : "person.crop.circle.badge.exclamationmark")
+                    .foregroundColor(authCoordinator.isAuthenticated ? .green : .orange)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    if authCoordinator.isAuthenticated {
+                        Text("Signed in")
+                            .font(.headline)
+                            .foregroundColor(.primary)
+
+                        if let user = authCoordinator.currentUser {
+                            Text(user.email)
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                    } else {
+                        Text("Sign in required for AI features")
+                            .font(.headline)
+                            .foregroundColor(.primary)
+
+                        Text("Click to authenticate")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                }
+
+                Spacer()
+
+                if authCoordinator.isAuthenticated {
+                    Button("Manage Account") {
+                        showAuthSheet = true
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                } else {
+                    Button("Sign In") {
+                        authCoordinator.openBrowserForLogin()
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.small)
+                }
+            }
+            .padding(12)
+            .background(authCoordinator.isAuthenticated ? Color.green.opacity(0.1) : Color.orange.opacity(0.1))
+            .cornerRadius(8)
+        }
+        .buttonStyle(.plain)
+    }
 }
 
 #Preview {
@@ -313,6 +380,7 @@ struct ContentView: View {
     let textFieldIntegration = TextFieldIntegration(keyboardMonitor: keyboardMonitor, textFieldReader: textFieldReader)
     let aiService = OpenAIService(apiKey: "test")
     let aiSuggestionEngine = AISuggestionEngine(aiService: aiService, textFieldIntegration: textFieldIntegration)
+    let authCoordinator = AuthenticationCoordinator()
 
     return ContentView(
         keyboardMonitor: keyboardMonitor,
@@ -320,4 +388,5 @@ struct ContentView: View {
         aiSuggestionEngine: aiSuggestionEngine,
         aiService: aiService
     )
+    .environmentObject(authCoordinator)
 }
