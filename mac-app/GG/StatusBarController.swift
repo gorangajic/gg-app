@@ -124,7 +124,6 @@ class StatusBarController: ObservableObject {
 }
 
 struct StatusBarMenuView: View {
-    @StateObject private var settings = SettingsManager()
     @State private var showMainWindow = false
 
     let overlayVisible: Bool
