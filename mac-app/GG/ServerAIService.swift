@@ -11,6 +11,7 @@ import Combine
 
 // MARK: - Server AI Service Implementation
 
+@MainActor
 class ServerAIService: AIServiceProtocol, ObservableObject {
 
     // MARK: - Published Properties
@@ -43,9 +44,15 @@ class ServerAIService: AIServiceProtocol, ObservableObject {
                 self.currentUser = response.user
             }
         } catch {
-            DispatchQueue.main.async {
-                self.lastError = .apiError(error.localizedDescription)
-            }
+            let errorCode = (error as? ServerAPIError).flatMap { serverError -> Int? in
+                switch serverError {
+                case .httpError(let statusCode), .apiError(let statusCode, _):
+                    return statusCode
+                default:
+                    return nil
+                }
+            } ?? 500
+            self.lastError = .apiError(errorCode, error.localizedDescription)
             throw error
         }
     }
@@ -56,14 +63,18 @@ class ServerAIService: AIServiceProtocol, ObservableObject {
 
         do {
             let response = try await apiClient.login(email: email, password: password)
-            DispatchQueue.main.async {
-                self.isAuthenticated = true
-                self.currentUser = response.user
-            }
+            self.isAuthenticated = true
+            self.currentUser = response.user
         } catch {
-            DispatchQueue.main.async {
-                self.lastError = .apiError(error.localizedDescription)
-            }
+            let errorCode = (error as? ServerAPIError).flatMap { serverError -> Int? in
+                switch serverError {
+                case .httpError(let statusCode), .apiError(let statusCode, _):
+                    return statusCode
+                default:
+                    return nil
+                }
+            } ?? 500
+            self.lastError = .apiError(errorCode, error.localizedDescription)
             throw error
         }
     }
@@ -74,14 +85,18 @@ class ServerAIService: AIServiceProtocol, ObservableObject {
 
         do {
             try await apiClient.logout()
-            DispatchQueue.main.async {
-                self.isAuthenticated = false
-                self.currentUser = nil
-            }
+            self.isAuthenticated = false
+            self.currentUser = nil
         } catch {
-            DispatchQueue.main.async {
-                self.lastError = .apiError(error.localizedDescription)
-            }
+            let errorCode = (error as? ServerAPIError).flatMap { serverError -> Int? in
+                switch serverError {
+                case .httpError(let statusCode), .apiError(let statusCode, _):
+                    return statusCode
+                default:
+                    return nil
+                }
+            } ?? 500
+            self.lastError = .apiError(errorCode, error.localizedDescription)
             throw error
         }
     }
@@ -98,7 +113,7 @@ class ServerAIService: AIServiceProtocol, ObservableObject {
 
         do {
             // Convert LocalAIContext to server's AIContext format
-            let serverContext = ServerAPIClient.AIContext(
+            let serverContext = AIContext(
                 appName: context.appName,
                 fieldType: context.fieldType,
                 textLength: context.textLength,
@@ -111,10 +126,8 @@ class ServerAIService: AIServiceProtocol, ObservableObject {
                 maxSuggestions: 5
             )
 
-            DispatchQueue.main.async {
-                self.requestCount += 1
-                self.isProcessing = false
-            }
+            self.requestCount += 1
+            self.isProcessing = false
 
             // Convert server suggestions to app suggestions
             let suggestions = response.suggestions.map { serverSuggestion -> AISuggestion in
@@ -140,10 +153,16 @@ class ServerAIService: AIServiceProtocol, ObservableObject {
             )
 
         } catch {
-            DispatchQueue.main.async {
-                self.isProcessing = false
-                self.lastError = .apiError(error.localizedDescription)
-            }
+            self.isProcessing = false
+            let errorCode = (error as? ServerAPIError).flatMap { serverError -> Int? in
+                switch serverError {
+                case .httpError(let statusCode), .apiError(let statusCode, _):
+                    return statusCode
+                default:
+                    return nil
+                }
+            } ?? 500
+            self.lastError = .apiError(errorCode, error.localizedDescription)
             throw error
         }
     }
@@ -159,9 +178,7 @@ class ServerAIService: AIServiceProtocol, ObservableObject {
         do {
             let response = try await apiClient.improveGrammar(text: text)
 
-            DispatchQueue.main.async {
-                self.requestCount += 1
-            }
+            self.requestCount += 1
 
             // Convert server changes to app changes
             let changes = response.changes.map { serverChange -> TextChange in
@@ -181,9 +198,15 @@ class ServerAIService: AIServiceProtocol, ObservableObject {
             )
 
         } catch {
-            DispatchQueue.main.async {
-                self.lastError = .apiError(error.localizedDescription)
-            }
+            let errorCode = (error as? ServerAPIError).flatMap { serverError -> Int? in
+                switch serverError {
+                case .httpError(let statusCode), .apiError(let statusCode, _):
+                    return statusCode
+                default:
+                    return nil
+                }
+            } ?? 500
+            self.lastError = .apiError(errorCode, error.localizedDescription)
             throw error
         }
     }
@@ -202,9 +225,7 @@ class ServerAIService: AIServiceProtocol, ObservableObject {
                 style: style.rawValue.lowercased()
             )
 
-            DispatchQueue.main.async {
-                self.requestCount += 1
-            }
+            self.requestCount += 1
 
             return AIRewriteResponse(
                 rewrittenText: response.rewritten,
@@ -213,9 +234,15 @@ class ServerAIService: AIServiceProtocol, ObservableObject {
             )
 
         } catch {
-            DispatchQueue.main.async {
-                self.lastError = .apiError(error.localizedDescription)
-            }
+            let errorCode = (error as? ServerAPIError).flatMap { serverError -> Int? in
+                switch serverError {
+                case .httpError(let statusCode), .apiError(let statusCode, _):
+                    return statusCode
+                default:
+                    return nil
+                }
+            } ?? 500
+            self.lastError = .apiError(errorCode, error.localizedDescription)
             throw error
         }
     }
@@ -240,6 +267,6 @@ class ServerAIService: AIServiceProtocol, ObservableObject {
 
 extension AIServiceError {
     static var notAuthenticated: AIServiceError {
-        return .apiError("Not authenticated. Please log in to use AI features.")
+        return .apiError(401, "Not authenticated. Please log in to use AI features.")
     }
 }
