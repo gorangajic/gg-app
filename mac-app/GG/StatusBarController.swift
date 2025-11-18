@@ -311,13 +311,13 @@ struct StatusBarMenuView: View {
             // Create new settings window if it doesn't exist
             let settingsView = AISettingsView(
                 suggestionEngine: AppDelegate.shared.aiSuggestionEngine ?? AISuggestionEngine(
-                    aiService: OpenAIService(apiKey: ""),
+                    aiService: ServerAIService(),
                     textFieldIntegration: TextFieldIntegration(
                         keyboardMonitor: KeyboardMonitor(),
                         textFieldReader: TextFieldReader()
                     )
                 ),
-                aiService: OpenAIService(apiKey: "")
+                aiService: ServerAIService()
             )
 
             let hostingController = NSHostingController(rootView: settingsView)
