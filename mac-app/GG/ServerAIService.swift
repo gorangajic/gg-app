@@ -88,7 +88,7 @@ class ServerAIService: AIServiceProtocol, ObservableObject {
 
     // MARK: - AIServiceProtocol Implementation
 
-    func generateSuggestions(for text: String, context: AIContext) async throws -> AISuggestionResponse {
+    func generateSuggestions(for text: String, context: LocalAIContext) async throws -> AISuggestionResponse {
         guard isAuthenticated else {
             throw AIServiceError.notAuthenticated
         }
@@ -97,7 +97,7 @@ class ServerAIService: AIServiceProtocol, ObservableObject {
         let startTime = Date()
 
         do {
-            // Convert AIContext to server's AIContext format
+            // Convert LocalAIContext to server's AIContext format
             let serverContext = ServerAPIClient.AIContext(
                 appName: context.appName,
                 fieldType: context.fieldType,
