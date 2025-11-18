@@ -356,7 +356,8 @@ struct ServerSetupStep: View {
         checking = true
         isServerReachable = false
 
-        guard let url = URL(string: "\(serverURL)/api/health") else {
+        // Just check if server responds at all (any status code means it's running)
+        guard let url = URL(string: serverURL) else {
             checking = false
             return
         }
@@ -367,9 +368,8 @@ struct ServerSetupStep: View {
         URLSession.shared.dataTask(with: request) { data, response, error in
             DispatchQueue.main.async {
                 checking = false
-                if let httpResponse = response as? HTTPURLResponse,
-                   httpResponse.statusCode == 200 || httpResponse.statusCode == 404 {
-                    // 404 is ok too - means server is running but endpoint doesn't exist
+                // If we got any HTTP response, server is reachable
+                if let httpResponse = response as? HTTPURLResponse {
                     isServerReachable = true
                 }
             }

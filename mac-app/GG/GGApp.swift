@@ -66,14 +66,6 @@ struct GGApp: App {
             TextFieldDemo()
         }
         .windowToolbarStyle(.unified)
-
-        // Onboarding window
-        WindowGroup("Welcome to TypeWise AI", id: "onboarding") {
-            OnboardingView(aiService: aiService)
-                .environmentObject(authCoordinator)
-        }
-        .windowResizability(.contentSize)
-        .defaultPosition(.center)
     }
 
     private func setupMonitoring() {
