@@ -126,6 +126,12 @@ class StatusBarController: ObservableObject {
 struct StatusBarMenuView: View {
     @State private var showMainWindow = false
 
+    // Settings stored directly in UserDefaults (removed SettingsManager dependency)
+    @State private var autoTriggerEnabled = UserDefaults.standard.object(forKey: "autoTriggerEnabled") as? Bool ?? true
+    @State private var minimumTextLength = UserDefaults.standard.object(forKey: "minimumTextLength") as? Int ?? 15
+    @State private var suggestionDelay = UserDefaults.standard.object(forKey: "suggestionDelay") as? Double ?? 2.0
+    @State private var maxSuggestions = UserDefaults.standard.object(forKey: "maxSuggestions") as? Int ?? 5
+
     let overlayVisible: Bool
     let lastSuggestionCount: Int
 
@@ -190,31 +196,43 @@ struct StatusBarMenuView: View {
                 Text("Quick Settings")
                     .font(.headline)
 
-                Toggle("Auto Suggestions", isOn: $settings.autoTriggerEnabled)
+                Toggle("Auto Suggestions", isOn: $autoTriggerEnabled)
+                    .onChange(of: autoTriggerEnabled) { newValue in
+                        UserDefaults.standard.set(newValue, forKey: "autoTriggerEnabled")
+                    }
 
                 HStack {
                     Text("Min Text Length:")
                     Spacer()
-                    TextField("15", value: $settings.minimumTextLength, format: .number)
+                    TextField("15", value: $minimumTextLength, format: .number)
                         .textFieldStyle(.roundedBorder)
                         .frame(width: 60)
+                        .onChange(of: minimumTextLength) { newValue in
+                            UserDefaults.standard.set(newValue, forKey: "minimumTextLength")
+                        }
                 }
 
                 HStack {
                     Text("Suggestion Delay:")
                     Spacer()
-                    TextField("2.0", value: $settings.suggestionDelay, format: .number)
+                    TextField("2.0", value: $suggestionDelay, format: .number)
                         .textFieldStyle(.roundedBorder)
                         .frame(width: 60)
+                        .onChange(of: suggestionDelay) { newValue in
+                            UserDefaults.standard.set(newValue, forKey: "suggestionDelay")
+                        }
                     Text("sec")
                 }
 
                 HStack {
                     Text("Max Suggestions:")
                     Spacer()
-                    TextField("5", value: $settings.maxSuggestions, format: .number)
+                    TextField("5", value: $maxSuggestions, format: .number)
                         .textFieldStyle(.roundedBorder)
                         .frame(width: 60)
+                        .onChange(of: maxSuggestions) { newValue in
+                            UserDefaults.standard.set(newValue, forKey: "maxSuggestions")
+                        }
                 }
             }
 

@@ -10,15 +10,35 @@ datasource db {
 }
 
 model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  password  String
-  name      String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  sessions  Session[]
+  id                        String          @id @default(cuid())
+  email                     String          @unique
+  password                  String
+  name                      String?
+
+  // Email verification
+  emailVerified             Boolean         @default(false)
+  verificationToken         String?         @unique
+  verificationTokenExpiry   DateTime?
+
+  // Password reset
+  resetToken                String?         @unique
+  resetTokenExpiry          DateTime?
+
+  // Usage quotas
+  dailyQuota                Int             @default(100)
+  usedQuota                 Int             @default(0)
+  quotaResetAt              DateTime        @default(now())
+
+  createdAt                 DateTime        @default(now())
+  updatedAt                 DateTime        @updatedAt
+
+  sessions                  Session[]
+  requestHistory            RequestHistory[]
 
   @@map("users")
+  @@index([email])
+  @@index([verificationToken])
+  @@index([resetToken])
 }
 
 model Session {
@@ -33,4 +53,25 @@ model Session {
   @@map("sessions")
   @@index([userId])
   @@index([token])
+}
+
+model RequestHistory {
+  id              String   @id @default(cuid())
+  userId          String
+  endpoint        String
+  method          String
+  statusCode      Int
+  processingTime  Int      // milliseconds
+  requestData     String?  @db.Text
+  responseData    String?  @db.Text
+  ipAddress       String?
+  userAgent       String?
+  createdAt       DateTime @default(now())
+
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("request_history")
+  @@index([userId])
+  @@index([createdAt])
+  @@index([endpoint])
 }

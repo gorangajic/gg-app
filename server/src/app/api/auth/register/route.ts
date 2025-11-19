@@ -1,7 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { prisma } from '@/lib/prisma';
-import { hashPassword, generateToken, createSession } from '@/lib/auth';
+import {
+  hashPassword,
+  generateToken,
+  createSession,
+  createVerificationToken,
+} from '@/lib/auth';
+import { sendVerificationEmail } from '@/lib/email';
+import { logInfo, logError } from '@/lib/logger';
+import { authRateLimiter } from '@/lib/rate-limiter';
 
 const registerSchema = z.object({
   email: z.string().email('Invalid email address'),
@@ -10,6 +18,12 @@ const registerSchema = z.object({
 });
 
 export async function POST(request: NextRequest) {
+  // Apply rate limiting
+  const rateLimitResult = await authRateLimiter(request);
+  if ('status' in rateLimitResult) {
+    return rateLimitResult;
+  }
+
   try {
     const body = await request.json();
     const validation = registerSchema.safeParse(body);
@@ -23,12 +37,15 @@ export async function POST(request: NextRequest) {
 
     const { email, password, name } = validation.data;
 
+    logInfo('User registration attempt', { email });
+
     // Check if user already exists
     const existingUser = await prisma.user.findUnique({
       where: { email },
     });
 
     if (existingUser) {
+      logInfo('Registration failed: User already exists', { email });
       return NextResponse.json(
         { error: 'User with this email already exists' },
         { status: 409 }
@@ -47,9 +64,26 @@ export async function POST(request: NextRequest) {
         id: true,
         email: true,
         name: true,
+        emailVerified: true,
         createdAt: true,
       },
     });
+
+    logInfo('User created successfully', { userId: user.id, email: user.email });
+
+    // Create verification token and send email
+    try {
+      const verificationToken = await createVerificationToken(user.id);
+      await sendVerificationEmail(email, verificationToken, name);
+      logInfo('Verification email sent', { userId: user.id });
+    } catch (error) {
+      logError({
+        error,
+        message: 'Failed to send verification email',
+        userId: user.id,
+      });
+      // Continue with registration even if email fails
+    }
 
     // Generate token and create session
     const token = generateToken({ userId: user.id, email: user.email });
@@ -57,14 +91,15 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(
       {
-        message: 'User registered successfully',
+        message:
+          'User registered successfully. Please check your email to verify your account.',
         user,
         token,
       },
-      { status: 201 }
+      { status: 201, headers: rateLimitResult.headers }
     );
   } catch (error) {
-    console.error('Registration error:', error);
+    logError({ error, message: 'Registration error' });
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
