@@ -7,9 +7,18 @@ class TypeWiseAI {
     this.isAuthenticated = false;
     this.activeElement = null;
     this.textBuffer = '';
+    this.previousText = '';
+    this.previousCursorPosition = 0;
     this.typingTimer = null;
     this.suggestionOverlay = null;
     this.currentSuggestions = [];
+    this.mutationObserver = null;
+    this.eventHandlers = {
+      focusin: null,
+      focusout: null,
+      input: null,
+      keydown: null
+    };
 
     this.init();
   }
@@ -36,42 +45,40 @@ class TypeWiseAI {
   }
 
   async loadSettings() {
-    return new Promise((resolve) => {
-      chrome.runtime.sendMessage({ action: 'getSettings' }, (response) => {
-        if (response && response.success) {
-          this.settings = response.settings;
-        } else {
-          // Default settings
-          this.settings = {
-            autoTrigger: true,
-            minTextLength: 10,
-            suggestionDelay: 2000,
-            maxSuggestions: 5
-          };
-        }
-        resolve();
-      });
-    });
+    const response = await chrome.runtime.sendMessage({ action: 'getSettings' });
+    if (response && response.success) {
+      this.settings = response.settings;
+    } else {
+      // Default settings
+      this.settings = {
+        autoTrigger: true,
+        minTextLength: 10,
+        suggestionDelay: 2000,
+        maxSuggestions: 5
+      };
+    }
   }
 
   async checkAuth() {
-    return new Promise((resolve) => {
-      chrome.runtime.sendMessage({ action: 'checkAuth' }, (response) => {
-        this.isAuthenticated = response && response.isAuthenticated;
-        resolve();
-      });
-    });
+    const response = await chrome.runtime.sendMessage({ action: 'checkAuth' });
+    this.isAuthenticated = response && response.isAuthenticated;
   }
 
   setupTextFieldMonitoring() {
+    // Store event handlers for cleanup
+    this.eventHandlers.focusin = (e) => this.handleFocusIn(e);
+    this.eventHandlers.focusout = (e) => this.handleFocusOut(e);
+    this.eventHandlers.input = (e) => this.handleInput(e);
+    this.eventHandlers.keydown = (e) => this.handleKeyDown(e);
+
     // Monitor all input fields, textareas, and contenteditable elements
-    document.addEventListener('focusin', (e) => this.handleFocusIn(e), true);
-    document.addEventListener('focusout', (e) => this.handleFocusOut(e), true);
-    document.addEventListener('input', (e) => this.handleInput(e), true);
-    document.addEventListener('keydown', (e) => this.handleKeyDown(e), true);
+    document.addEventListener('focusin', this.eventHandlers.focusin, true);
+    document.addEventListener('focusout', this.eventHandlers.focusout, true);
+    document.addEventListener('input', this.eventHandlers.input, true);
+    document.addEventListener('keydown', this.eventHandlers.keydown, true);
 
     // Monitor dynamically added elements
-    const observer = new MutationObserver((mutations) => {
+    this.mutationObserver = new MutationObserver((mutations) => {
       mutations.forEach((mutation) => {
         mutation.addedNodes.forEach((node) => {
           if (node.nodeType === Node.ELEMENT_NODE) {
@@ -81,10 +88,46 @@ class TypeWiseAI {
       });
     });
 
-    observer.observe(document.body, {
+    this.mutationObserver.observe(document.body, {
       childList: true,
       subtree: true
     });
+  }
+
+  cleanup() {
+    // Remove event listeners
+    if (this.eventHandlers.focusin) {
+      document.removeEventListener('focusin', this.eventHandlers.focusin, true);
+    }
+    if (this.eventHandlers.focusout) {
+      document.removeEventListener('focusout', this.eventHandlers.focusout, true);
+    }
+    if (this.eventHandlers.input) {
+      document.removeEventListener('input', this.eventHandlers.input, true);
+    }
+    if (this.eventHandlers.keydown) {
+      document.removeEventListener('keydown', this.eventHandlers.keydown, true);
+    }
+
+    // Disconnect mutation observer
+    if (this.mutationObserver) {
+      this.mutationObserver.disconnect();
+      this.mutationObserver = null;
+    }
+
+    // Clear timers
+    if (this.typingTimer) {
+      clearTimeout(this.typingTimer);
+      this.typingTimer = null;
+    }
+
+    // Remove overlay
+    if (this.suggestionOverlay && this.suggestionOverlay.parentNode) {
+      this.suggestionOverlay.parentNode.removeChild(this.suggestionOverlay);
+      this.suggestionOverlay = null;
+    }
+
+    console.log('TypeWise AI: Cleaned up');
   }
 
   attachToNewElements(element) {
@@ -206,15 +249,88 @@ class TypeWiseAI {
     return '';
   }
 
-  setElementText(element, text) {
+  getCursorPosition(element) {
+    if (!element) return 0;
+
+    if (element.tagName.toLowerCase() === 'input' || element.tagName.toLowerCase() === 'textarea') {
+      return element.selectionStart || 0;
+    } else if (element.contentEditable === 'true') {
+      const selection = window.getSelection();
+      if (selection.rangeCount > 0) {
+        const range = selection.getRangeAt(0);
+        const preCaretRange = range.cloneRange();
+        preCaretRange.selectNodeContents(element);
+        preCaretRange.setEnd(range.endContainer, range.endOffset);
+        return preCaretRange.toString().length;
+      }
+    }
+
+    return 0;
+  }
+
+  setCursorPosition(element, position) {
     if (!element) return;
+
+    if (element.tagName.toLowerCase() === 'input' || element.tagName.toLowerCase() === 'textarea') {
+      element.setSelectionRange(position, position);
+    } else if (element.contentEditable === 'true') {
+      const range = document.createRange();
+      const selection = window.getSelection();
+
+      let currentPos = 0;
+      let found = false;
+
+      const walk = (node) => {
+        if (found) return;
+
+        if (node.nodeType === Node.TEXT_NODE) {
+          const length = node.textContent.length;
+          if (currentPos + length >= position) {
+            range.setStart(node, position - currentPos);
+            range.setEnd(node, position - currentPos);
+            found = true;
+            return;
+          }
+          currentPos += length;
+        } else {
+          for (let i = 0; i < node.childNodes.length; i++) {
+            walk(node.childNodes[i]);
+            if (found) return;
+          }
+        }
+      };
+
+      walk(element);
+
+      if (found) {
+        selection.removeAllRanges();
+        selection.addRange(range);
+      }
+    }
+  }
+
+  setElementText(element, text, preserveCursor = true) {
+    if (!element) return;
+
+    const cursorPosition = preserveCursor ? this.getCursorPosition(element) : 0;
 
     if (element.tagName.toLowerCase() === 'input' || element.tagName.toLowerCase() === 'textarea') {
       element.value = text;
       element.dispatchEvent(new Event('input', { bubbles: true }));
+
+      if (preserveCursor) {
+        // Adjust cursor position if text length changed
+        const newPosition = Math.min(cursorPosition, text.length);
+        this.setCursorPosition(element, newPosition);
+      }
     } else if (element.contentEditable === 'true') {
       element.textContent = text;
       element.dispatchEvent(new Event('input', { bubbles: true }));
+
+      if (preserveCursor) {
+        const newPosition = Math.min(cursorPosition, text.length);
+        this.setCursorPosition(element, newPosition);
+      }
     }
   }
 
@@ -284,6 +400,7 @@ class TypeWiseAI {
         <div class="typewise-suggestions"></div>
       </div>
       <div class="typewise-overlay-footer">
+        <button class="typewise-undo-button hidden" aria-label="Undo">↶ Undo</button>
         <span class="typewise-hint">Use ↑↓ to navigate, Enter to apply, Esc to close</span>
       </div>
     `;
@@ -293,6 +410,11 @@ class TypeWiseAI {
     // Set up close button
     this.suggestionOverlay.querySelector('.typewise-overlay-close').addEventListener('click', () => {
       this.hideSuggestions();
+    });
+
+    // Set up undo button
+    this.suggestionOverlay.querySelector('.typewise-undo-button').addEventListener('click', () => {
+      this.undoLastSuggestion();
     });
   }
 
@@ -352,19 +474,52 @@ class TypeWiseAI {
 
     const rect = this.activeElement.getBoundingClientRect();
     const overlayRect = this.suggestionOverlay.getBoundingClientRect();
+    const viewportWidth = window.innerWidth;
+    const viewportHeight = window.innerHeight;
+
+    // Constants
+    const PADDING = 10;
+    const MIN_WIDTH = 280;
+    const MAX_WIDTH = 400;
+
+    // Calculate responsive width
+    const availableWidth = viewportWidth - (2 * PADDING);
+    const width = Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, availableWidth));
+    this.suggestionOverlay.style.width = `${width}px`;
+
+    // Recalculate overlay dimensions after width adjustment
+    const updatedOverlayRect = this.suggestionOverlay.getBoundingClientRect();
 
     // Position below the active element by default
-    let top = rect.bottom + window.scrollY + 10;
+    let top = rect.bottom + window.scrollY + PADDING;
     let left = rect.left + window.scrollX;
 
-    // If overlay goes off-screen to the right, align to right edge
-    if (left + overlayRect.width > window.innerWidth) {
-      left = window.innerWidth - overlayRect.width - 20;
+    // Ensure overlay stays within horizontal bounds
+    if (left + updatedOverlayRect.width > viewportWidth - PADDING) {
+      left = viewportWidth - updatedOverlayRect.width - PADDING;
+    }
+    if (left < PADDING) {
+      left = PADDING;
     }
 
-    // If overlay goes off-screen at the bottom, position above
-    if (top + overlayRect.height > window.innerHeight + window.scrollY) {
-      top = rect.top + window.scrollY - overlayRect.height - 10;
+    // Check if there's enough space below
+    const spaceBelow = viewportHeight - rect.bottom;
+    const spaceAbove = rect.top;
+
+    // If not enough space below and more space above, position above
+    if (spaceBelow < updatedOverlayRect.height + PADDING && spaceAbove > spaceBelow) {
+      top = rect.top + window.scrollY - updatedOverlayRect.height - PADDING;
+    }
+
+    // Ensure overlay doesn't go above viewport
+    if (top < window.scrollY + PADDING) {
+      top = window.scrollY + PADDING;
+    }
+
+    // Ensure overlay doesn't go below viewport
+    const maxTop = window.scrollY + viewportHeight - updatedOverlayRect.height - PADDING;
+    if (top > maxTop) {
+      top = Math.max(window.scrollY + PADDING, maxTop);
     }
 
     this.suggestionOverlay.style.top = `${top}px`;
@@ -406,12 +561,47 @@ class TypeWiseAI {
   applySuggestion(index) {
     if (!this.currentSuggestions[index] || !this.activeElement) return;
 
+    // Save current state for undo
+    this.previousText = this.getElementText(this.activeElement);
+    this.previousCursorPosition = this.getCursorPosition(this.activeElement);
+
     const suggestion = this.currentSuggestions[index];
-    this.setElementText(this.activeElement, suggestion.suggestion);
+    this.setElementText(this.activeElement, suggestion.suggestion, false);
     this.textBuffer = suggestion.suggestion;
+
+    // Show undo button
+    const undoButton = this.suggestionOverlay.querySelector('.typewise-undo-button');
+    if (undoButton) {
+      undoButton.classList.remove('hidden');
+    }
+
     this.hideSuggestions();
 
     console.log('TypeWise AI: Applied suggestion:', suggestion);
+  }
+
+  undoLastSuggestion() {
+    if (!this.activeElement || !this.previousText) {
+      console.log('TypeWise AI: No previous text to restore');
+      return;
+    }
+
+    // Restore previous text and cursor position
+    this.setElementText(this.activeElement, this.previousText, false);
+    this.setCursorPosition(this.activeElement, this.previousCursorPosition);
+    this.textBuffer = this.previousText;
+
+    // Hide undo button
+    const undoButton = this.suggestionOverlay.querySelector('.typewise-undo-button');
+    if (undoButton) {
+      undoButton.classList.add('hidden');
+    }
+
+    // Clear previous state
+    this.previousText = '';
+    this.previousCursorPosition = 0;
+
+    console.log('TypeWise AI: Undone last suggestion');
   }
 
   getSuggestionIcon(type) {
